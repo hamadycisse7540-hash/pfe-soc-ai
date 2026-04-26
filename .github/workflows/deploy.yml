@@ -1,0 +1,30 @@
+name: Validate and Deploy Detection Rules
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Validate XML rules syntax
+        run: |
+          sudo apt-get install -y libxml2-utils
+          xmllint --noout rules/local_rules.xml
+          echo "XML syntax OK"
+
+      - name: Run Python syntax check
+        run: |
+          python3 -m py_compile scripts/ai_detector_v3.py
+          python3 -m py_compile scripts/flask_api.py
+          echo "Python syntax OK"
+
+      - name: Check required files
+        run: |
+          test -f rules/local_rules.xml
+          test -f scripts/ai_detector_v3.py
+          test -f scripts/flask_api.py
+          echo "All required files present"
