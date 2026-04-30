@@ -1,0 +1,24 @@
+<group name="syslog,sshd,">
+  <rule id="100010" level="12" frequency="5" timeframe="300">
+    <if_matched_sid>5758</if_matched_sid>
+    <same_source_ip />
+    <description>Attaque SSH brute force persistante - Multiples dépassements de tentatives d'authentification depuis la même IP</description>
+    <mitre>
+      <id>T1110.001</id>
+    </mitre>
+    <group>authentication_failures,brute_force_attack,</group>
+    <options>no_email_alert</options>
+  </rule>
+
+  <rule id="100011" level="14" frequency="3" timeframe="600">
+    <if_matched_sid>5758</if_matched_sid>
+    <match>dstuser: root</match>
+    <same_source_ip />
+    <description>Attaque SSH brute force CRITIQUE sur compte root - Blocage immédiat requis</description>
+    <mitre>
+      <id>T1110.001</id>
+      <id>T1078.003</id>
+    </mitre>
+    <group>authentication_failures,brute_force_attack,pci_dss_10.2.4,pci_dss_10.2.5,gdpr_IV_35.7.d,</group>
+  </rule>
+</group>
