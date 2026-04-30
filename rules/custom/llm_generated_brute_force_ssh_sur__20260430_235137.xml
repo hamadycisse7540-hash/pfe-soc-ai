@@ -1,0 +1,26 @@
+<group name="local,syslog,sshd,">
+  <rule id="100016" level="14">
+    <if_sid>100015</if_sid>
+    <match>PAM</match>
+    <regex>authentication failure</regex>
+    <same_source_ip />
+    <description>Persistent brute force attack - Multiple repeated attempts from same IP</description>
+    <mitre>
+      <id>T1110.001</id>
+    </mitre>
+    <group>authentication_failed,brute_force,pci_dss_10.2.4,pci_dss_10.2.5,gpg13_7.8,gdpr_IV_35.7.d,gdpr_IV_32.2,hipaa_164.312.b,nist_800_53_AU.14,nist_800_53_AC.7,tsc_CC6.1,tsc_CC6.8</group>
+    <options>no_email_alert</options>
+  </rule>
+
+  <rule id="100017" level="15" frequency="15" timeframe="300">
+    <if_matched_sid>100015</if_matched_sid>
+    <same_source_ip />
+    <description>CRITICAL: Massive brute force campaign detected - Automatic blocking recommended</description>
+    <mitre>
+      <id>T1110.001</id>
+      <id>T1110</id>
+    </mitre>
+    <group>authentication_failed,brute_force,active_response,pci_dss_10.2.4,pci_dss_10.2.5,gdpr_IV_35.7.d</group>
+    <options>alert_by_email</options>
+  </rule>
+</group>
