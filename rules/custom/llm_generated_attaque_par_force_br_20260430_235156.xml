@@ -1,0 +1,16 @@
+<group name="syslog,sshd,">
+  <rule id="100010" level="12">
+    <if_sid>5758</if_sid>
+    <same_source_ip />
+    <description>Attaque par force brute SSH persistante détectée - Blocage recommandé</description>
+    <options>no_email_alert</options>
+    <frequency>5</frequency>
+    <timeframe>300</timeframe>
+    <mitre>
+      <id>T1110.001</id>
+      <tactic>Credential Access</tactic>
+      <technique>Brute Force: Password Guessing</technique>
+    </mitre>
+    <group>authentication_failures,attack,pci_dss_11.4,pci_dss_10.2.4,pci_dss_10.2.5,gdpr_IV_35.7.d,hipaa_164.312.b,nist_800_53_SI.4,nist_800_53_AU.14,tsc_CC6.1,tsc_CC6.8,tsc_CC7.2,tsc_CC7.3,</group>
+  </rule>
+</group>
