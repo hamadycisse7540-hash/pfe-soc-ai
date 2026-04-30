@@ -1,0 +1,14 @@
+<group name="llm_generated,local,">
+<rule id="100015" level="12">
+  <if_sid>5758</if_sid>
+  <srcip>192.168.1.134</srcip>
+  <match>maximum authentication attempts exceeded for root</match>
+  <description>Brute force SSH répété sur compte root depuis IP suspecte 192.168.1.134</description>
+  <mitre>
+    <id>T1110.001</id>
+    <tactic>Credential Access</tactic>
+    <technique>Brute Force: Password Guessing</technique>
+  </mitre>
+  <group>authentication_failed,brute_force_attack,pci_dss_11.4,pci_dss_10.2.4,pci_dss_10.2.5,gdpr_IV_35.7.d,hipaa_164.312.b,nist_800_53_SI.4,nist_800_53_AU.14,tsc_CC6.1,tsc_CC6.8,tsc_CC7.2,tsc_CC7.3</group>
+</rule>
+</group>

@@ -1,30 +1,81 @@
-name: Validate and Deploy Detection Rules
+name: Detection as Code — Validate and Deploy
 
 on:
   push:
     branches: [ main ]
+    paths:
+      - 'rules/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'rules/**'
 
 jobs:
   validate:
+    name: Validate Rules
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
 
-      - name: Validate XML rules syntax
-        run: |
-          sudo apt-get install -y libxml2-utils
-          xmllint --noout rules/local_rules.xml
-          echo "XML syntax OK"
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
 
-      - name: Run Python syntax check
-        run: |
-          python3 -m py_compile scripts/ai_detector_v3.py
-          python3 -m py_compile scripts/flask_api.py
-          echo "Python syntax OK"
+      - name: Install xmllint
+        run: sudo apt-get install -y libxml2-utils
 
-      - name: Check required files
+      - name: Validate XML syntax with xmllint
         run: |
-          test -f rules/local_rules.xml
-          test -f scripts/ai_detector_v3.py
-          test -f scripts/flask_api.py
-          echo "All required files present"
+          echo "Validation syntaxe XML..."
+          for f in rules/custom/*.xml; do
+            xmllint --noout "$f" && echo "OK: $f" || exit 1
+          done
+
+      - name: Run Python unit tests
+        run: |
+          echo "Tests unitaires..."
+          python rules/tests/test_rules.py
+
+      - name: Check rule IDs in valid range (100000-199999)
+        run: |
+          python3 << 'PYEOF'
+          import xml.etree.ElementTree as ET, os, sys
+          errors = []
+          for f in os.listdir("rules/custom"):
+              if not f.endswith('.xml'): continue
+              tree = ET.parse(f"rules/custom/{f}")
+              for rule in tree.findall('.//rule'):
+                  rid = int(rule.get('id', 0))
+                  if not (100000 <= rid <= 199999):
+                      errors.append(f"ID {rid} hors plage dans {f}")
+          if errors:
+              print('\n'.join(errors)); sys.exit(1)
+          print("OK tous les IDs sont dans la plage 100000-199999")
+          PYEOF
+
+  deploy:
+    name: Deploy to Wazuh
+    needs: validate
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Deploy rules via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.WAZUH_IP }}
+          username: ${{ secrets.WAZUH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /tmp
+            git clone https://github.com/hamadycisse7540-hash/pfe-soc-ai.git repo_tmp
+            sudo cp repo_tmp/rules/custom/*.xml /var/ossec/etc/rules/
+            sudo /var/ossec/bin/wazuh-analysisd -t
+            sudo systemctl restart wazuh-manager
+            rm -rf repo_tmp
+            echo "Déploiement réussi : $(date)"
+
+      - name: Notify deployment success
+        run: echo "Règles déployées avec succès sur Wazuh"
