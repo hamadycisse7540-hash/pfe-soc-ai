@@ -1,0 +1,3 @@
+<group name="llm_generated,local,">
+<rule id="100020" level="12"><if_sid>5763</if_sid><match>Failed password for root</match><same_source_ip /><description>Tentative de brute force SSH répétée sur compte root détectée</description><group>brute_force,authentication_failures,</group></rule>
+</group>
