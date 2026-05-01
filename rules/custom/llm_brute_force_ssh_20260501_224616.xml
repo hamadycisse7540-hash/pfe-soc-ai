@@ -1,0 +1,3 @@
+<group name="llm_generated,local,">
+<rule id="100020" level="12"><if_sid>5758</if_sid><match>maximum authentication attempts exceeded</match><description>SSH Brute Force - Tentatives maximales depassees</description><options>no_full_log</options><group>authentication_failed,brute_force,</group></rule>
+</group>
