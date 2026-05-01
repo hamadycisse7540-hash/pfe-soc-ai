@@ -1,0 +1,3 @@
+<group name="llm_generated,local,">
+<rule id="100020" level="12"><if_sid>5716</if_sid><same_source_ip /><description>Tentative de brute force SSH sur compte root détectée</description><group>brute_force,authentication_failures,</group></rule>
+</group>
