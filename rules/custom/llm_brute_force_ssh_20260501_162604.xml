@@ -1,3 +1,0 @@
-<group name="llm_generated,local,">
-<rule id="100020" level="12"><if_sid>5716</if_sid><match>5 more authentication failures</match><description>Tentative de brute force SSH intensive sur compte root detectee</description><group>brute_force,authentication_failed,</group></rule>
-</group>
