@@ -1,0 +1,18 @@
+[Unit]
+Description=PFE SOC - LLM Detection as Code Analyst
+After=wazuh-manager.service
+Wants=wazuh-manager.service
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/pfe_soc
+EnvironmentFile=/home/ubuntu/pfe_soc/.env
+Environment="PYTHONUNBUFFERED=1"
+ExecStart=/home/ubuntu/ml_env/bin/python3 /home/ubuntu/pfe_soc/llm_analyst_v3.py
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

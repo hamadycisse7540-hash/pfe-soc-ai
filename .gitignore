@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.db
+*.log
+.env
+venv/
+ml_env/
+dataset/
+archive/
+logs/
+*.csv
+.rule_id_counter

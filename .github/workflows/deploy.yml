@@ -1,0 +1,80 @@
+name: Detection as Code — Validate and Deploy Rules
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'rules/**'
+
+jobs:
+  validate:
+    name: Validate Rules
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install xmllint
+        run: sudo apt-get install -y libxml2-utils
+
+      - name: Validate XML syntax
+        run: |
+          echo "=== Validation syntaxe XML ==="
+          failed=0
+          for f in rules/custom/llm_*.xml; do
+            [ -f "$f" ] || continue
+            echo -n "  Vérification $f ... "
+            xmllint --noout "$f" 2>/dev/null && echo "OK" || { echo "ERREUR"; failed=1; }
+          done
+          [ $failed -eq 0 ] || exit 1
+          echo "Toutes les règles sont valides"
+
+      - name: Check unique IDs
+        run: python3 rules/tests/test_rules.py
+
+  deploy:
+    name: Deploy to Wazuh
+    runs-on: self-hosted
+    needs: validate
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy LLM rules to Wazuh
+        run: |
+          echo "=== Déploiement des règles LLM sur Wazuh ==="
+          deployed=0
+          for f in rules/custom/llm_*.xml; do
+            [ -f "$f" ] || continue
+            fname=$(basename $f)
+            dest="/var/ossec/etc/rules/$fname"
+            if [ ! -f "$dest" ]; then
+              sudo cp "$f" "$dest"
+              sudo chown root:wazuh "$dest"
+              sudo chmod 640 "$dest"
+              echo "  Déployé: $fname"
+              deployed=$((deployed+1))
+            else
+              echo "  Existe déjà: $fname"
+            fi
+          done
+          echo "Règles déployées: $deployed"
+
+      - name: Reload Wazuh
+        if: success()
+        run: |
+          echo "=== Rechargement Wazuh ==="
+          sudo /var/ossec/bin/wazuh-analysisd -t
+          if [ $? -eq 0 ]; then
+            sudo systemctl restart wazuh-manager
+            sleep 10
+            sudo systemctl is-active wazuh-manager
+            echo "Wazuh rechargé avec succès"
+          else
+            echo "Erreur de validation - Wazuh non rechargé"
+            exit 1
+          fi
+
+      - name: Verify deployment
+        run: |
+          echo "=== Règles actives dans Wazuh ==="
+          ls /var/ossec/etc/rules/llm_*.xml 2>/dev/null | wc -l
+          echo "règles LLM actives"

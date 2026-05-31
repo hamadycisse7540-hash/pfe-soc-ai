@@ -1,0 +1,13 @@
+[Unit]
+Description=PFE SOC Dashboard API
+After=wazuh-manager.service
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/pfe_soc
+ExecStart=/home/ubuntu/ml_env/bin/python3 /home/ubuntu/pfe_soc/soc_dashboard.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
