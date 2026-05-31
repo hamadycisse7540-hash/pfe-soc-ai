@@ -1,0 +1,9 @@
+<group name="llm_generated,local,web,apache,">
+<rule id="100051" level="12">
+  <if_sid>31151</if_sid>
+  <match>nikto|sqlmap|UNION SELECT|script</match>
+  <description>LLM: Scan systematique de repertoires CGI vulnerables depuis la meme IP source avec multiples erreur</description>
+  <mitre><id>T1190</id></mitre>
+  <group>web_attack,pci_dss_6.5,gdpr_IV_35.7.d,</group>
+</rule>
+</group>
