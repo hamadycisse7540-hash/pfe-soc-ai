@@ -1,0 +1,11 @@
+<group name="local,web,apache,">
+  <rule id="100005" level="10">
+    <if_sid>30105</if_sid>
+    <match>nikto|sqlmap|nmap</match>
+    <description>Custom: Web vulnerability scanner detected in Apache access log</description>
+    <mitre>
+      <id>T1595.003</id>
+    </mitre>
+    <group>web_attack,scanner,reconnaissance,pci_dss_11.4,</group>
+  </rule>
+</group>

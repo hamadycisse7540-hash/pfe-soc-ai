@@ -1,0 +1,10 @@
+<group name="local,syslog,adduser,">
+  <rule id="100008" level="10">
+    <if_sid>5901</if_sid>
+    <description>Custom: Privilege escalation - new user or group created</description>
+    <mitre>
+      <id>T1136.001</id>
+    </mitre>
+    <group>privilege_escalation,adduser,pci_dss_10.2.5,gdpr_IV_32.2,</group>
+  </rule>
+</group>

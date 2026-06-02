@@ -1,0 +1,10 @@
+<group name="local,syslog,sudo,">
+  <rule id="100006" level="12">
+    <if_sid>5402</if_sid>
+    <description>Custom: Privilege escalation - sudo to ROOT executed</description>
+    <mitre>
+      <id>T1548.003</id>
+    </mitre>
+    <group>privilege_escalation,sudo,pci_dss_10.2.5,gdpr_IV_32.2,</group>
+  </rule>
+</group>
