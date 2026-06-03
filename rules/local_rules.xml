@@ -1,10 +1,5 @@
-<group name="local,syslog,sshd,">
-  <!-- Règle minimale pour Nmap via iptables - détection uniquement -->
-  <rule id="100002" level="10">
-    <if_sid>4100</if_sid>
-    <match>IPTABLES-DROP</match>
-    <srcip>!127.0.0.1</srcip>
-    <description>Port scan detected via iptables DROP log</description>
-    <group>scan_detection,reconnaissance,nmap_scan,</group>
-  </rule>
+<!-- Local rules -->
+<!-- Copyright (C) 2015, Wazuh Inc. -->
+<!-- Les regles custom sont dans les fichiers rule_1000XX_*.xml -->
+<group name="local,">
 </group>
