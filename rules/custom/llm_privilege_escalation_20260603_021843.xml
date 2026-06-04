@@ -2,7 +2,7 @@
 <rule id="100051" level="14">
   <if_sid>5402</if_sid>
   <match>sudo|root|NOPASSWD</match>
-  <description>LLM: Echecs authentification SSH multiples sur compte root depuis IP suspecte indiquant tentative es</description>
+  <description>LLM: Tentative d'escalade de privileges via sudo vers root detectee</description>
   <mitre><id>T1548.003</id></mitre>
   <group>privilege_escalation,pci_dss_10.2.5,gdpr_IV_32.2,</group>
 </rule>
