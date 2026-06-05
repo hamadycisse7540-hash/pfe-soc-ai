@@ -1,9 +1,0 @@
-<group name="llm_generated,local,syslog,">
-<rule id="100052" level="14" frequency="10" timeframe="30">
-  <if_matched_sid>40113</if_matched_sid>
-  <same_source_ip />
-  <description>Attaque SYN flood detectee avec volume eleve de paquets depuis une source unique necessitant</description>
-  <mitre><id>T1498</id></mitre>
-  <group>dos_attack,pci_dss_11.4,</group>
-</rule>
-</group>
