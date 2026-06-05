@@ -234,13 +234,17 @@ def build_xml(category: str, level: int, parent_sid: str, description: str) -> s
     description = description.replace('"', '').replace("'", '').replace('<', '').replace('>', '')
     if not description:
         description = f"LLM: Detection {category}"
-    
+
+    # Tronque proprement sur une frontière de mot (evite "...tentative es")
+    if len(description) > 100:
+        description = description[:100].rsplit(' ', 1)[0]
+
     return template.format(
         id=rid,
         rule_id=rid,
         level=max(8, min(15, level)),
         parent_sid=parent_sid,
-        description=description[:100]
+        description=description
     )
 
 def deploy(xml_str: str, category: str) -> bool:

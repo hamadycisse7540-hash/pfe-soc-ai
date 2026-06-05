@@ -382,7 +382,24 @@ def process(alert: dict):
             description=result.get("description_regle", f"LLM: {category} detected")
         )
         print(f"  Generation regle XML (template {category})...")
+        rule_filename = f"llm_{category}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xml"
         deploy(xml, category)
+        # Email automatique ingenieur SOC
+        if EMAIL_ENABLED:
+            try:
+                send_attack_report({
+                    "timestamp": datetime.now().isoformat(),
+                    "category": category,
+                    "attack_type": result.get("type_attaque", category),
+                    "severity": result.get("severite", "HAUTE"),
+                    "srcip": srcip,
+                    "description": alert.get("rule", {}).get("description", ""),
+                    "action": result.get("action", ""),
+                    "rule_file": rule_filename
+                })
+                print(f"  [EMAIL] Rapport envoye a l ingenieur SOC")
+            except Exception as e:
+                print(f"  [EMAIL] Erreur: {e}")
     else:
         print(f"  (pas de nouvelle regle necessaire)")
 
