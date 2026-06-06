@@ -1,0 +1,8 @@
+<group name="llm_generated,local,">
+<rule id="100053" level="15">
+  <if_sid>1002</if_sid>
+  <description>LLM: Tentative d exploitation Shellshock detectee via requete HTTP avec injection de commande bash</description>
+  <mitre><id>T1059</id></mitre>
+  <group>llm_detected,</group>
+</rule>
+</group>
