@@ -1,11 +1,54 @@
 <group name="local,syslog,sshd,">
-  <rule id="100003" level="12" frequency="8" timeframe="120">
-    <if_matched_sid>5716</if_matched_sid>
+
+  <!-- 
+    RÈGLE 1 — Détection d'un échec SSH
+    Trigger : if_sid=5760 (règle native Wazuh "sshd: authentication failed")
+    Match    : pattern "Failed password" dans le log original
+    Logique  : chaque fois que le log SSH contient "Failed password",
+               on enrichit la détection avec notre règle custom
+  -->
+  <rule id="100010" level="6">
+    <if_sid>5760</if_sid>
+    <match>Failed password</match>
+    <description>Custom: Echec SSH - pattern "Failed password" detecte (T1110.001)</description>
+    <mitre>
+      <id>T1110.001</id>
+    </mitre>
+    <group>authentication_failed,pci_dss_10.2.4,gdpr_IV_35.7.d,</group>
+  </rule>
+
+  <!-- 
+    RÈGLE 2 — Détection utilisateur invalide SSH
+    Trigger : if_sid=5760
+    Match    : pattern "Invalid user" dans le log
+    Logique  : tentative SSH sur un compte inexistant = indicateur d'enumeration
+  -->
+  <rule id="100011" level="6">
+    <if_sid>5760</if_sid>
+    <match>Invalid user</match>
+    <description>Custom: Enumeration SSH - pattern "Invalid user" detecte (T1110.003)</description>
+    <mitre>
+      <id>T1110.003</id>
+    </mitre>
+    <group>authentication_failed,pci_dss_10.2.4,</group>
+  </rule>
+
+  <!-- 
+    RÈGLE 3 — Brute Force SSH détecté
+    Trigger : if_matched_sid=100010 (notre règle Failed password)
+    Match    : frequency=8 occurrences en timeframe=120 secondes
+               same_source_ip = même IP source pour toutes les tentatives
+    Logique  : 8 échecs "Failed password" depuis la même IP en 2 minutes
+               = comportement de brute force automatisé (Hydra, Medusa, etc.)
+  -->
+  <rule id="100003" level="14" frequency="8" timeframe="120">
+    <if_matched_sid>100010</if_matched_sid>
     <same_source_ip />
-    <description>Custom: SSH brute force attack detected from same source IP</description>
+    <description>Custom: BRUTE FORCE SSH - 8 echecs "Failed password" en 120s depuis meme IP (T1110)</description>
     <mitre>
       <id>T1110</id>
     </mitre>
     <group>brute_force,authentication_failures,pci_dss_11.4,gdpr_IV_35.7.d,</group>
   </rule>
+
 </group>
