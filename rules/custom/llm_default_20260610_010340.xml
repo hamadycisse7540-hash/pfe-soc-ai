@@ -1,0 +1,8 @@
+<group name="llm_generated,local,">
+<rule id="100051" level="14">
+  <if_sid>1002</if_sid>
+  <description>LLM: Tentative de brute force SSH detectee sur compte root avec 8 echecs de mot de passe en 120</description>
+  <mitre><id>T1059</id></mitre>
+  <group>llm_detected,</group>
+</rule>
+</group>
