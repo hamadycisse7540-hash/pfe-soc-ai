@@ -1,21 +1,10 @@
 <group name="local,syslog,">
-
-  <!--
-    RÈGLE — Escalade par echec authentification repetee
-    Trigger : if_sid=5503 (multiple auth failures)
-    Match    : "authentication failure" OU "pam_unix" dans le log PAM
-    Logique  : détecte les echecs PAM répétés qui indiquent une tentative
-               d'escalade via des mécanismes d'authentification (su, sudo, etc.)
-               Pattern PAM caractéristique : "pam_unix(sudo:auth): authentication failure"
-  -->
-  <rule id="100007" level="14">
+  <!-- Règle atomique : échecs PAM répétés -->
+  <rule id="100007" level="10">
     <if_sid>5503</if_sid>
     <match>authentication failure|pam_unix</match>
-    <description>Custom: Escalade privileges via echecs PAM repetés - pattern "authentication failure" detecte (T1078)</description>
-    <mitre>
-      <id>T1078</id>
-    </mitre>
-    <group>privilege_escalation,authentication_failures,pci_dss_10.2.4,</group>
+    <description>Custom: Échecs authentification PAM multiples — possible tentative de brute force (T1110)</description>
+    <mitre><id>T1110</id></mitre>
+    <group>authentication_failures,pci_dss_10.2.4,</group>
   </rule>
-
 </group>
