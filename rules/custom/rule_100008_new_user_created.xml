@@ -1,10 +1,21 @@
 <group name="local,syslog,adduser,">
+
+  <!--
+    RÈGLE — Création d'un nouvel utilisateur ou groupe
+    Trigger : if_sid=5901 (useradd/groupadd)
+    Match    : "useradd|adduser|groupadd" dans le log syslog
+    Logique  : détecte la création de nouveaux comptes via les commandes
+               useradd/adduser/groupadd, technique classique de persistence
+               après compromission (T1136.001 - Create Local Account)
+  -->
   <rule id="100008" level="10">
     <if_sid>5901</if_sid>
-    <description>Custom: Privilege escalation - new user or group created</description>
+    <match>useradd|adduser|groupadd|new user|new group</match>
+    <description>Custom: Création compte/groupe système - patterns "useradd|adduser|groupadd" detectes (T1136.001)</description>
     <mitre>
       <id>T1136.001</id>
     </mitre>
     <group>privilege_escalation,adduser,pci_dss_10.2.5,gdpr_IV_32.2,</group>
   </rule>
+
 </group>
