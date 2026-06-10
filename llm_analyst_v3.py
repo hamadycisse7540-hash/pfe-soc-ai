@@ -43,18 +43,25 @@ seen = set()
 deployed_hashes = set()
 
 ATTACK_CATEGORIES = {
-    "brute_force_ssh": {"5710","5711","5712","5716","5720","5763","2502",
-                        "40111","5760","5758","5551",
-                        "100003","100010","100009"},  # nos regles custom brute force SSH
-    "nmap_scan":       {"40101","40102","1002","100002","100050","100056"},
-    "auth_failure":    {"5503","5501","5502","100007"},  # echecs PAM
-    "web_attack":      {"31100","31101","31106","31151","31152","31153","31153","31154","31155","31153","31154","31155",
-                        "100004","100005","31103","31104"},
-    "auth_failure":    {"5501","5502","5503"},
-    "rootcheck":       {"510","511","512"},
-    "dos_attack":      {"40113","40114","1001","100052"},
-    "privilege_escalation": {"5402","5403","5404","5405",
-                              "100006","100007","100008"},
+    # SSH — echecs individuels et brute force
+    "brute_force_ssh":     {"5710","5711","5712","5716","5720","5763","2502",
+                            "40111","5760","5758","5551",
+                            "100003","100010","100009"},
+    # Scan reseau — iptables DROP
+    "nmap_scan":           {"40101","40102","1002","100002","100050","100056"},
+    # Echecs PAM (su, sudo, login) — distinct du brute force SSH
+    "auth_failure":        {"5501","5502","5503","100007"},
+    # Attaques web Apache
+    "web_attack":          {"31100","31101","31106","31151","31152","31153",
+                            "31154","31155","31103","31104",
+                            "100004","100005"},
+    # Rootcheck / intégrité
+    "rootcheck":           {"510","511","512"},
+    # DoS / DDoS
+    "dos_attack":          {"40113","40114","1001","100052"},
+    # Escalade de privileges (sudo root, new user)
+    "privilege_escalation":{"5402","5403","5404","5405",
+                            "100006","100008"},
 }
 
 # Templates XML PRÉ-VALIDÉS par Wazuh 4.7.5
