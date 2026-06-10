@@ -38,8 +38,25 @@ def next_rule_id():
         f.write(str(next_id))
     return current
 
-# Cache anti-doublons : (categorie, srcip)
-seen = set()
+# Cache anti-doublons : (categorie, srcip) — persistant sur disque
+SEEN_FILE = os.path.expanduser("~/pfe_soc/.seen_categories.json")
+
+def load_seen():
+    """Charge le cache depuis le disque au démarrage."""
+    try:
+        data = json.load(open(SEEN_FILE))
+        return set(tuple(x) for x in data)
+    except:
+        return set()
+
+def save_seen(seen_set):
+    """Sauvegarde le cache sur disque."""
+    try:
+        json.dump(list(seen_set), open(SEEN_FILE, 'w'))
+    except:
+        pass
+
+seen = load_seen()
 deployed_hashes = set()
 
 ATTACK_CATEGORIES = {
@@ -356,6 +373,7 @@ def process(alert: dict):
     if key in seen:
         return
     seen.add(key)
+    save_seen(seen)  # Persistance anti-doublon
 
     print(f"\n[LLM] Analyse alerte niveau {level} — {desc}")
     print(f"  Categorie : {category} | IP : {srcip}")
