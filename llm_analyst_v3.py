@@ -65,7 +65,7 @@ ATTACK_CATEGORIES = {
                             "40111","5760","5758","5551",
                             "100003","100010","100009"},
     # Scan reseau — iptables DROP
-    "nmap_scan":           {"40101","40102","1002","100002","100050","100056"},
+    "nmap_scan":           {"40101","40102","1002","100002"},  # 100050+ = regles LLM, pas incluses
     # Echecs PAM (su, sudo, login) — distinct du brute force SSH
     "auth_failure":        {"5501","5502","5503","100007"},
     # Attaques web Apache
@@ -353,10 +353,12 @@ def process(alert: dict):
     if level < MIN_LEVEL:
         return
 
-    # Ignore les alertes déclenchées par nos propres règles LLM
-    # Ignore seulement les règles LLM auto-générées (>= 100050)
-    if rule_id.startswith("1000") and int(rule_id) >= 100050:
-        return
+    # Ignore toutes les alertes générées par nos règles LLM (>= 100050)
+    try:
+        if int(rule_id) >= 100050:
+            return
+    except:
+        pass
 
     # Ignore aussi les groupes llm_generated
     if "llm_generated" in str(alert.get("rule",{}).get("groups",[])):
