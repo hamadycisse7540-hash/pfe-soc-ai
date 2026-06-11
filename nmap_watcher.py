@@ -3,7 +3,7 @@ import subprocess, time, json, re
 from datetime import datetime
 
 seen_ips = {}
-COOLDOWN = 300  # 5 minutes
+COOLDOWN = 60  # 1 minute pour demo  # 5 minutes
 ALERTS_FILE = "/var/ossec/logs/alerts/alerts.json"
 # IPs Kali connues uniquement
 KALI_IPS = {"192.168.1.139", "192.168.1.140"}

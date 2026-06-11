@@ -1,12 +1,20 @@
 <group name="local,syslog,firewall,">
-  <!-- Règle de corrélation : 20 paquets iptables DROP en 60s depuis la même IP -->
-  <rule id="100002" level="10" frequency="20" timeframe="60">
-    <if_matched_sid>4100</if_matched_sid>
+
+  <!--
+    RÈGLE — Port Scan détecté via iptables DROP
+    Trigger : decoded_as=iptables-custom (notre decoder)
+    Match    : pattern "IPTABLES-DROP" dans le log kernel
+    Logique  : notre decoder extrait srcip du log iptables.
+               La règle détecte chaque paquet DROP depuis une IP externe.
+               Un scan Nmap génère des dizaines de DROP en quelques secondes.
+  -->
+  <rule id="100002" level="10">
+    <decoded_as>iptables-custom</decoded_as>
     <match>IPTABLES-DROP</match>
-    <same_source_ip />
     <srcip>!127.0.0.1</srcip>
-    <description>Custom: Port Scan detecte — 20+ paquets iptables DROP en 60s depuis meme IP (T1046)</description>
+    <description>Custom: Paquet DROP iptables detecte - indicateur scan reseau (T1046)</description>
     <mitre><id>T1046</id></mitre>
     <group>scan_detection,reconnaissance,pci_dss_11.4,</group>
   </rule>
+
 </group>

@@ -29,6 +29,8 @@ sudo rm -f /var/ossec/etc/rules/llm_*.xml
 rm -f ~/pfe_soc/rules/custom/llm_*.xml
 cd ~/pfe_soc
 git add rules/custom/ 2>/dev/null
+rm -f ~/pfe_soc/.seen_categories.json
+echo "  Cache anti-doublons vidé"
 git diff --cached --quiet || git commit -m "Demo reset: nettoyage regles LLM"
 git push 2>/dev/null || true
 echo "100050" > ~/pfe_soc/.rule_id_counter
