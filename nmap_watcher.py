@@ -20,9 +20,17 @@ for line in proc.stdout:
     if not m:
         continue
     srcip = m.group(1)
-    
+
     # Seulement les IPs Kali connues
     if srcip not in KALI_IPS:
+        continue
+
+    # Ignore le trafic Wazuh agent (port 1514) — faux positif
+    if 'DPT=1514' in line or 'SPT=1514' in line:
+        continue
+
+    # Ignore aussi les connexions SSH etablies (ACK sans SYN = pas un scan)
+    if 'ACK' in line and 'SYN' not in line:
         continue
     
     # Cooldown
