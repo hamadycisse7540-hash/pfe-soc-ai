@@ -3,18 +3,17 @@
   <!--
     RÈGLE — Privilege Escalation sudo vers ROOT
     Trigger : if_sid=5402 (règle native "Successful sudo to ROOT executed")
-    Match    : pattern "COMMAND" dans le log sudo = commande exécutée avec sudo
-               + pattern "USER=root" = escalade vers root confirmée
-    Logique  : détecte toute commande sudo exécutée en tant que root,
-               indicateur de T1548.003 (Sudo and Sudo Caching)
+    Match    : pattern "USER=root" dans le log sudo
+    Exclusion: utilisateur "ubuntu" = admin légitime du manager SOC
+    Logique  : détecte les escalades root depuis des comptes suspects
+               (hacker, www-data, etc.) mais pas l'admin du système
   -->
   <rule id="100006" level="12">
     <if_sid>5402</if_sid>
     <match>USER=root</match>
+    <user>!ubuntu</user>
     <description>Custom: Privilege escalation - sudo vers ROOT detecte via pattern USER=root (T1548.003)</description>
-    <mitre>
-      <id>T1548.003</id>
-    </mitre>
+    <mitre><id>T1548.003</id></mitre>
     <group>privilege_escalation,sudo,pci_dss_10.2.5,gdpr_IV_32.2,</group>
   </rule>
 
