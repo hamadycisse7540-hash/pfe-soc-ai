@@ -1,0 +1,9 @@
+<group name="llm_generated,local,syslog,">
+<rule id="100051" level="12" frequency="5" timeframe="60">
+  <if_matched_sid>5503</if_matched_sid>
+  <same_source_ip />
+  <description>LLM: Tentatives multiples de brute force SSH sur compte root detectees depuis la meme IP source</description>
+  <mitre><id>T1078</id></mitre>
+  <group>authentication_failed,pci_dss_10.2.4,</group>
+</rule>
+</group>
