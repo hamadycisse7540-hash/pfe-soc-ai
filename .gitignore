@@ -10,3 +10,4 @@ archive/
 logs/
 *.csv
 .rule_id_counter
+.seen_categories.json
