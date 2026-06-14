@@ -1,0 +1,8 @@
+<group name="llm_generated,local,">
+<rule id="100058" level="15">
+  <if_sid>1002</if_sid>
+  <description>LLM: Tentative exploitation Shellshock avec payload CVE-2014-6271 et CVE-2014-6278 dans headers HTTP</description>
+  <mitre><id>T1059</id></mitre>
+  <group>llm_detected,</group>
+</rule>
+</group>
