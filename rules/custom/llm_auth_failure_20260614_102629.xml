@@ -1,0 +1,9 @@
+<group name="llm_generated,local,syslog,">
+<rule id="100050" level="12" frequency="5" timeframe="60">
+  <if_matched_sid>5503</if_matched_sid>
+  <same_source_ip />
+  <description>LLM: auth_failure detected</description>
+  <mitre><id>T1078</id></mitre>
+  <group>authentication_failed,pci_dss_10.2.4,</group>
+</rule>
+</group>
