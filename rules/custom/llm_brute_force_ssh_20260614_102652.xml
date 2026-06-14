@@ -1,0 +1,9 @@
+<group name="llm_generated,local,syslog,sshd,">
+<rule id="100051" level="14" frequency="8" timeframe="120">
+  <if_matched_sid>5763</if_matched_sid>
+  <same_source_ip />
+  <description>LLM: Detection de tentative de brute force SSH repetee depuis la meme IP source</description>
+  <mitre><id>T1110</id></mitre>
+  <group>brute_force,authentication_failures,pci_dss_11.4,gdpr_IV_35.7.d,</group>
+</rule>
+</group>
