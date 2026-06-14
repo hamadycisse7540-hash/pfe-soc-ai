@@ -370,10 +370,21 @@ def process(alert: dict):
         return
 
     category = get_category(rule_id)
-    key = (category, srcip)
+    # Clé = catégorie uniquement (pas IP)
+    # 1 seule règle LLM par catégorie d'attaque, quelle que soit l'IP source
+    key = (category,)
 
     if key in seen:
         return
+
+    # Vérifie aussi si une règle LLM pour cette catégorie existe déjà dans Wazuh
+    llm_files = [f for f in os.listdir("/var/ossec/etc/rules/")
+                 if f.startswith(f"llm_{category}_") and f.endswith(".xml")]
+    if llm_files:
+        seen.add(key)
+        save_seen(seen)
+        return
+
     seen.add(key)
     save_seen(seen)  # Persistance anti-doublon
 
