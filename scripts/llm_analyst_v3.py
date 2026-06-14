@@ -63,11 +63,10 @@ ATTACK_CATEGORIES = {
     # SSH — echecs individuels et brute force
     "brute_force_ssh":     {"5710","5711","5712","5716","5720","5763","2502",
                             "40111","5760","5758","5551",
-                            "100003","100010","100009"},
+                            "100003","100010","100009",
+                            "5501","5502","5503","100007"},  # PAM fusionne avec SSH brute force
     # Scan reseau — iptables DROP
     "nmap_scan":           {"40101","40102","1002","100002"},  # 100050+ = regles LLM, pas incluses
-    # Echecs PAM (su, sudo, login) — distinct du brute force SSH
-    "auth_failure":        {"5501","5502","5503","100007"},
     # Attaques web Apache
     "web_attack":          {"31100","31101","31106","31151","31152","31153",
                             "31154","31155","31103","31104",
