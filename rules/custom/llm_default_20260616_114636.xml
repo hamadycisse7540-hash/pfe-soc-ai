@@ -1,8 +1,0 @@
-<group name="llm_generated,local,">
-<rule id="100053" level="15">
-  <if_sid>1002</if_sid>
-  <description>LLM: Tentative exploitation Shellshock detectee avec injection de commandes dans les en-tetes HTTP</description>
-  <mitre><id>T1059</id></mitre>
-  <group>llm_detected,</group>
-</rule>
-</group>
