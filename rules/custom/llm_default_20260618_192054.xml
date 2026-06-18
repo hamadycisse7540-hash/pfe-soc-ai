@@ -1,0 +1,8 @@
+<group name="llm_generated,local,">
+<rule id="100064" level="15">
+  <if_sid>1002</if_sid>
+  <description>LLM: Tentative exploitation vulnerabilite Shellshock CVE-2014-6271 detectee dans les logs Apache</description>
+  <mitre><id>T1059</id></mitre>
+  <group>llm_detected,</group>
+</rule>
+</group>
