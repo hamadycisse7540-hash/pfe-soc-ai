@@ -6,7 +6,7 @@ seen_ips = {}
 COOLDOWN = 60  # 1 minute pour demo  # 5 minutes
 ALERTS_FILE = "/var/ossec/logs/alerts/alerts.json"
 # IPs Kali connues uniquement
-KALI_IPS = {"192.168.1.139", "192.168.1.140"}
+KALI_IPS = {"192.168.1.139", "192.168.1.140", "192.168.1.158"}
 
 print("[Nmap Watcher] Démarré - détecte uniquement les IPs Kali")
 
