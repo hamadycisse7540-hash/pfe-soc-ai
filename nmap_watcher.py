@@ -5,8 +5,28 @@ from datetime import datetime
 seen_ips = {}
 COOLDOWN = 60  # 1 minute pour demo  # 5 minutes
 ALERTS_FILE = "/var/ossec/logs/alerts/alerts.json"
-# IPs Kali connues uniquement
-KALI_IPS = {"192.168.1.139", "192.168.1.140", "192.168.1.158"}
+# IPs Kali — détection dynamique depuis Wazuh + IPs connues
+def get_kali_ips():
+    """Récupère les IPs des agents Kali enregistrés dans Wazuh."""
+    ips = {"192.168.1.139", "192.168.1.140", "192.168.1.158"}
+    try:
+        import subprocess
+        result = subprocess.run(
+            ["sudo", "/var/ossec/bin/agent_control", "-l"],
+            capture_output=True, text=True, timeout=5
+        )
+        for line in result.stdout.splitlines():
+            if "kali" in line.lower() or "001" in line:
+                parts = line.split()
+                for p in parts:
+                    if p.count(".") == 3 and p != "127.0.0.1":
+                        ips.add(p)
+    except Exception:
+        pass
+    return ips
+
+KALI_IPS = get_kali_ips()
+print(f"[Nmap Watcher] IPs Kali surveillées : {KALI_IPS}")
 
 print("[Nmap Watcher] Démarré - détecte uniquement les IPs Kali")
 
