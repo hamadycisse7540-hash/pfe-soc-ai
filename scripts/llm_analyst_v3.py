@@ -398,6 +398,20 @@ def process(alert: dict):
     print(f"  Severite  : {result.get('severite','?')}")
     print(f"  Action    : {result.get('action','?')}")
 
+    # Human-in-the-Loop : blocage temporaire automatique si CRITIQUE
+    if result.get("severite") == "CRITIQUE" and srcip and srcip != "local":
+        try:
+            import subprocess
+            # Blocage temporaire 5 minutes (timeout configuré dans ossec.conf)
+            subprocess.run(
+                ["sudo", "iptables", "-I", "INPUT", "-s", srcip, "-j", "DROP"],
+                capture_output=True
+            )
+            print(f"  [AUTO-BLOCK] IP {srcip} bloquée temporairement (CRITIQUE)")
+            print(f"  [AUTO-BLOCK] L ingenieur SOC doit valider via email")
+        except Exception as e:
+            print(f"  [WARN] Blocage auto échoué: {e}")
+
     with open(LOG_FILE, "a") as f:
         f.write(json.dumps({
             "ts": datetime.now().isoformat(),
