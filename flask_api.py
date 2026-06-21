@@ -102,7 +102,7 @@ def top_ips():
     ranked = sorted(ips.items(), key=lambda x:-x[1])[:10]
     return jsonify({"top_ips": [{"ip": ip, "count": c} for ip,c in ranked]})
 
-@app.route('/api/block/<ip>')
+@app.route('/api/block/<ip>', methods=['GET','POST'])
 def block_ip(ip):
     result = subprocess.run(
         ['sudo', 'iptables', '-I', 'INPUT', '-s', ip, '-j', 'DROP'],
@@ -115,7 +115,7 @@ def block_ip(ip):
         "timestamp": datetime.now().isoformat()
     })
 
-@app.route('/api/unblock/<ip>')
+@app.route('/api/unblock/<ip>', methods=['GET','POST'])
 def unblock_ip(ip):
     result = subprocess.run(
         ['sudo', 'iptables', '-D', 'INPUT', '-s', ip, '-j', 'DROP'],
@@ -128,7 +128,8 @@ def unblock_ip(ip):
         "timestamp": datetime.now().isoformat()
     })
 
-@app.route('/api/blocked')
+@app.route('/api/blocked-ips', methods=['GET'])
+@app.route('/api/blocked', methods=['GET'])
 def blocked_ips():
     result = subprocess.run(
         ['sudo', 'iptables', '-L', 'INPUT', '-n'],
@@ -145,3 +146,71 @@ def blocked_ips():
 if __name__ == '__main__':
     print(f"[{datetime.now()}] API Flask SOC démarrée sur http://0.0.0.0:8080")
     app.run(host='0.0.0.0', port=8080, debug=False)
+
+# ============================================================
+# Amélioration future — Human-in-the-Loop IP Management
+# ============================================================
+import subprocess as _sp
+
+@app.route('/api/blocked-ips', methods=['GET'])
+def get_blocked_ips():
+    """Liste les IPs actuellement bloquées par iptables."""
+    try:
+        result = _sp.run(
+            ['sudo', 'iptables', '-L', 'INPUT', '-n', '--line-numbers'],
+            capture_output=True, text=True
+        )
+        blocked = []
+        for line in result.stdout.splitlines():
+            if 'DROP' in line and 'INPUT' not in line and 'Chain' not in line:
+                parts = line.split()
+                if len(parts) >= 5:
+                    blocked.append({
+                        'line': parts[0],
+                        'ip': parts[4],
+                        'protocol': parts[3]
+                    })
+        return jsonify({'blocked_ips': blocked, 'count': len(blocked)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/unblock/<ip>', methods=['POST'])
+def unblock_ip(ip):
+    """Débloque une IP — action réservée à l'analyste SOC."""
+    import re
+    if not re.match(r'^\d+\.\d+\.\d+\.\d+$', ip):
+        return jsonify({'error': 'IP invalide'}), 400
+    try:
+        result = _sp.run(
+            ['sudo', 'iptables', '-D', 'INPUT', '-s', ip, '-j', 'DROP'],
+            capture_output=True, text=True
+        )
+        if result.returncode == 0:
+            return jsonify({
+                'status': 'unblocked',
+                'ip': ip,
+                'message': f'IP {ip} débloquée par analyste SOC'
+            })
+        else:
+            return jsonify({'error': 'IP non trouvée dans les règles'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/block/<ip>', methods=['POST'])
+def block_ip_manual(ip):
+    """Bloque manuellement une IP — action analyste SOC."""
+    import re
+    if not re.match(r'^\d+\.\d+\.\d+\.\d+$', ip):
+        return jsonify({'error': 'IP invalide'}), 400
+    try:
+        _sp.run(
+            ['sudo', 'iptables', '-I', 'INPUT', '-s', ip, '-j', 'DROP'],
+            capture_output=True, text=True
+        )
+        return jsonify({
+            'status': 'blocked',
+            'ip': ip,
+            'message': f'IP {ip} bloquée par analyste SOC'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
