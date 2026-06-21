@@ -398,19 +398,50 @@ def process(alert: dict):
     print(f"  Severite  : {result.get('severite','?')}")
     print(f"  Action    : {result.get('action','?')}")
 
-    # Human-in-the-Loop : blocage temporaire automatique si CRITIQUE
-    if result.get("severite") == "CRITIQUE" and srcip and srcip != "local":
-        try:
-            import subprocess
-            # Blocage temporaire 5 minutes (timeout configuré dans ossec.conf)
-            subprocess.run(
-                ["sudo", "iptables", "-I", "INPUT", "-s", srcip, "-j", "DROP"],
-                capture_output=True
-            )
-            print(f"  [AUTO-BLOCK] IP {srcip} bloquée temporairement (CRITIQUE)")
-            print(f"  [AUTO-BLOCK] L ingenieur SOC doit valider via email")
-        except Exception as e:
-            print(f"  [WARN] Blocage auto échoué: {e}")
+    # Human-in-the-Loop : réponse graduée selon sévérité
+    severite = result.get("severite", "")
+    if srcip and srcip not in ("local", "", "127.0.0.1", "::1"):
+        if severite == "CRITIQUE":
+            # Blocage temporaire 1h + validation SOC requise
+            try:
+                import subprocess, threading
+                subprocess.run(
+                    ["sudo", "iptables", "-I", "INPUT", "-s", srcip, "-j", "DROP"],
+                    capture_output=True
+                )
+                print(f"  [AUTO-BLOCK] CRITIQUE — IP {srcip} bloquée 1h")
+                print(f"  [VALIDATION] Analyste SOC doit valider via email")
+                # Déblocage automatique après 3600s
+                def unblock(ip):
+                    import time, subprocess
+                    time.sleep(3600)
+                    subprocess.run(["sudo","iptables","-D","INPUT","-s",ip,"-j","DROP"],
+                                   capture_output=True)
+                    print(f"  [AUTO-UNBLOCK] IP {ip} débloquée après 1h")
+                threading.Thread(target=unblock, args=(srcip,), daemon=True).start()
+            except Exception as e:
+                print(f"  [WARN] Blocage auto échoué: {e}")
+        elif severite == "HAUTE":
+            # Blocage temporaire 15 min, pas de validation requise
+            try:
+                import subprocess, threading
+                subprocess.run(
+                    ["sudo", "iptables", "-I", "INPUT", "-s", srcip, "-j", "DROP"],
+                    capture_output=True
+                )
+                print(f"  [AUTO-BLOCK] HAUTE — IP {srcip} bloquée 15 min")
+                def unblock(ip):
+                    import time, subprocess
+                    time.sleep(900)
+                    subprocess.run(["sudo","iptables","-D","INPUT","-s",ip,"-j","DROP"],
+                                   capture_output=True)
+                    print(f"  [AUTO-UNBLOCK] IP {ip} débloquée après 15 min")
+                threading.Thread(target=unblock, args=(srcip,), daemon=True).start()
+            except Exception as e:
+                print(f"  [WARN] Blocage auto échoué: {e}")
+        else:
+            # MOYENNE/FAIBLE — notification email uniquement
+            print(f"  [INFO] {severite} — Email envoyé, pas de blocage auto")
 
     with open(LOG_FILE, "a") as f:
         f.write(json.dumps({
