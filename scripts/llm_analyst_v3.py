@@ -411,14 +411,12 @@ def process(alert: dict):
                 )
                 print(f"  [AUTO-BLOCK] CRITIQUE — IP {srcip} bloquée 1h")
                 print(f"  [VALIDATION] Analyste SOC doit valider via email")
-                # Déblocage automatique après 3600s
-                def unblock(ip):
-                    import time, subprocess
-                    time.sleep(3600)
-                    subprocess.run(["sudo","iptables","-D","INPUT","-s",ip,"-j","DROP"],
-                                   capture_output=True)
-                    print(f"  [AUTO-UNBLOCK] IP {ip} débloquée après 1h")
-                threading.Thread(target=unblock, args=(srcip,), daemon=True).start()
+                # Déblocage automatique après 3600s — processus bash détaché
+                subprocess.Popen(
+                    f'sleep 3600 && sudo iptables -D INPUT -s {srcip} -j DROP',
+                    shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                )
+                print(f"  [AUTO-UNBLOCK] Déblocage planifié dans 60 min")
             except Exception as e:
                 print(f"  [WARN] Blocage auto échoué: {e}")
         elif severite == "HAUTE":
@@ -430,13 +428,12 @@ def process(alert: dict):
                     capture_output=True
                 )
                 print(f"  [AUTO-BLOCK] HAUTE — IP {srcip} bloquée 15 min")
-                def unblock(ip):
-                    import time, subprocess
-                    time.sleep(900)
-                    subprocess.run(["sudo","iptables","-D","INPUT","-s",ip,"-j","DROP"],
-                                   capture_output=True)
-                    print(f"  [AUTO-UNBLOCK] IP {ip} débloquée après 15 min")
-                threading.Thread(target=unblock, args=(srcip,), daemon=True).start()
+                # Déblocage automatique après 900s — processus bash détaché
+                subprocess.Popen(
+                    f'sleep 900 && sudo iptables -D INPUT -s {srcip} -j DROP',
+                    shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                )
+                print(f"  [AUTO-UNBLOCK] Déblocage planifié dans 15 min")
             except Exception as e:
                 print(f"  [WARN] Blocage auto échoué: {e}")
         else:
