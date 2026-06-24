@@ -4,27 +4,31 @@ Systeme de rapport d'attaque pour ingenieur SOC
 Envoie un email HTML structure apres chaque detection critique
 """
 import os
+
+def _load_env():
+    env_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+    if os.path.exists(env_file) and not os.environ.get('EMAIL_PASS'):
+        with open(env_file) as f:
+            for line in f:
+                line = line.strip()
+                if '=' in line and not line.startswith('#'):
+                    k, v = line.split('=', 1)
+                    os.environ.setdefault(k.strip(), v.strip())
+_load_env()
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 
-# ============================================================
-# CONFIGURATION EMAIL — valeurs chargées depuis .env
-# (systemd les injecte via EnvironmentFile ; voir .env.example)
-# ============================================================
 SMTP_HOST  = os.environ.get("SMTP_HOST", "smtp.gmail.com")
 SMTP_PORT  = int(os.environ.get("SMTP_PORT", "587"))
 EMAIL_FROM = os.environ.get("EMAIL_FROM", "")
-EMAIL_PASS = os.environ.get("EMAIL_PASS", "")   # Mot de passe d'application Gmail (jamais en dur)
+EMAIL_PASS = os.environ.get("EMAIL_PASS", "")
 EMAIL_TO   = os.environ.get("EMAIL_TO", EMAIL_FROM)
-
-# Seulement envoyer pour ces severites
 ALERT_SEVERITIES = {"CRITIQUE", "HAUTE"}
+FLASK_URL  = "http://192.168.1.132:8080"
 
 def send_attack_report(detection: dict) -> bool:
-    """Envoie un rapport structure a l'ingenieur SOC"""
-
     severity    = detection.get('severity', 'INCONNUE')
     category    = detection.get('category', 'unknown')
     attack_type = detection.get('attack_type', 'Inconnu')
@@ -33,8 +37,8 @@ def send_attack_report(detection: dict) -> bool:
     rule_file   = detection.get('rule_file', '')
     timestamp   = detection.get('timestamp', datetime.now().isoformat())
     description = detection.get('description', '')
+    auto_action = detection.get('auto_action', '')
 
-    # Filtre par severite
     if severity not in ALERT_SEVERITIES:
         return False
 
@@ -45,14 +49,7 @@ def send_attack_report(detection: dict) -> bool:
         'BASSE':    '#198754'
     }.get(severity, '#6c757d')
 
-    severity_emoji = {
-        'CRITIQUE': 'CRITIQUE',
-        'HAUTE':    'HAUTE',
-        'MOYENNE':  'MOYENNE',
-        'BASSE':    'BASSE'
-    }.get(severity, severity)
-
-    subject = f"[SOC ALERT] {severity_emoji} | {attack_type} depuis {srcip}"
+    subject = f"[SOC ALERT] {severity} | {attack_type} depuis {srcip}"
 
     html_body = f"""<!DOCTYPE html>
 <html lang="fr">
@@ -62,18 +59,19 @@ def send_attack_report(detection: dict) -> bool:
 
   <!-- HEADER -->
   <div style="background:#0d1b2a;padding:28px 30px;text-align:center">
-    <h1 style="color:#00d4ff;margin:0;font-size:1.4rem">
-      SOC Alert - AI Detection as Code
-    </h1>
-    <p style="color:#8892b0;margin:8px 0 0;font-size:0.9rem">
-      Rapport automatique genere par Claude AI - PFE 2026
-    </p>
+    <h1 style="color:#00d4ff;margin:0;font-size:1.4rem">SOC Alert - AI Detection as Code</h1>
+    <p style="color:#8892b0;margin:8px 0 0;font-size:0.9rem">Rapport automatique genere par Claude AI - PFE 2026</p>
   </div>
 
   <!-- SEVERITY BANNER -->
   <div style="background:{severity_color};padding:16px;text-align:center">
-    <span style="color:white;font-size:1.2rem;font-weight:bold;letter-spacing:1px">
-      SEVERITE : {severity}
+    <span style="color:white;font-size:1.2rem;font-weight:bold;letter-spacing:1px">SEVERITE : {severity}</span>
+  </div>
+
+  <!-- WARNING BANNER -->
+  <div style="background:#fff3cd;border:1px solid #ffc107;padding:14px 20px;text-align:center">
+    <span style="color:#856404;font-weight:bold;font-size:0.95rem">
+      ⚠️ Veuillez verifier la legitimite de cette attaque au niveau SOC avant toute action definitive
     </span>
   </div>
 
@@ -85,96 +83,75 @@ def send_attack_report(detection: dict) -> bool:
 
     <table style="width:100%;border-collapse:collapse">
       <tr style="background:#f8f9fa">
-        <td style="padding:12px 15px;font-weight:bold;color:#495057;width:38%;border-bottom:1px solid #dee2e6">
-          Timestamp
-        </td>
-        <td style="padding:12px 15px;color:#212529;border-bottom:1px solid #dee2e6">
-          {timestamp[:19].replace('T', ' ')}
-        </td>
+        <td style="padding:12px 15px;font-weight:bold;color:#495057;width:38%;border-bottom:1px solid #dee2e6">Timestamp</td>
+        <td style="padding:12px 15px;color:#212529;border-bottom:1px solid #dee2e6">{timestamp[:19].replace('T', ' ')}</td>
       </tr>
       <tr>
-        <td style="padding:12px 15px;font-weight:bold;color:#495057;border-bottom:1px solid #dee2e6">
-          Type d'attaque
-        </td>
-        <td style="padding:12px 15px;color:#212529;font-weight:bold;border-bottom:1px solid #dee2e6">
-          {attack_type}
+        <td style="padding:12px 15px;font-weight:bold;color:#495057;border-bottom:1px solid #dee2e6">Type d'attaque</td>
+        <td style="padding:12px 15px;color:#212529;font-weight:bold;border-bottom:1px solid #dee2e6">{attack_type}</td>
+      </tr>
+      <tr style="background:#f8f9fa">
+        <td style="padding:12px 15px;font-weight:bold;color:#495057;border-bottom:1px solid #dee2e6">Categorie</td>
+        <td style="padding:12px 15px;color:#212529;border-bottom:1px solid #dee2e6">{category}</td>
+      </tr>
+      <tr>
+        <td style="padding:12px 15px;font-weight:bold;color:#495057;border-bottom:1px solid #dee2e6">IP Source</td>
+        <td style="padding:12px 15px;border-bottom:1px solid #dee2e6">
+          <a href="https://ipinfo.io/{srcip}" style="color:#dc3545;font-family:monospace;font-size:1.1rem;font-weight:bold;text-decoration:none">
+            {srcip} &#x1F517; (Infos IP)
+          </a>
         </td>
       </tr>
       <tr style="background:#f8f9fa">
-        <td style="padding:12px 15px;font-weight:bold;color:#495057;border-bottom:1px solid #dee2e6">
-          Categorie
-        </td>
-        <td style="padding:12px 15px;color:#212529;border-bottom:1px solid #dee2e6">
-          {category}
-        </td>
+        <td style="padding:12px 15px;font-weight:bold;color:#495057;border-bottom:1px solid #dee2e6">Description Wazuh</td>
+        <td style="padding:12px 15px;color:#212529;border-bottom:1px solid #dee2e6">{description}</td>
       </tr>
       <tr>
-        <td style="padding:12px 15px;font-weight:bold;color:#495057;border-bottom:1px solid #dee2e6">
-          IP Source
-        </td>
-        <td style="padding:12px 15px;font-family:monospace;font-size:1.1rem;color:#dc3545;font-weight:bold;border-bottom:1px solid #dee2e6">
-          {srcip}
-        </td>
+        <td style="padding:12px 15px;font-weight:bold;color:#495057;border-bottom:1px solid #dee2e6">Regle LLM deployee</td>
+        <td style="padding:12px 15px;font-family:monospace;color:#198754;border-bottom:1px solid #dee2e6">{rule_file}</td>
       </tr>
       <tr style="background:#f8f9fa">
-        <td style="padding:12px 15px;font-weight:bold;color:#495057;border-bottom:1px solid #dee2e6">
-          Description Wazuh
-        </td>
-        <td style="padding:12px 15px;color:#212529;border-bottom:1px solid #dee2e6">
-          {description}
-        </td>
-      </tr>
-      <tr>
-        <td style="padding:12px 15px;font-weight:bold;color:#495057">
-          Regle LLM deployee
-        </td>
-        <td style="padding:12px 15px;font-family:monospace;color:#198754">
-          {rule_file}
-        </td>
+        <td style="padding:12px 15px;font-weight:bold;color:#495057">Action effectuee automatiquement</td>
+        <td style="padding:12px 15px;color:#dc3545;font-weight:bold">{auto_action if auto_action else 'Aucune action automatique (severite non critique)'}</td>
       </tr>
     </table>
 
-    <!-- ACTION RECOMMENDED -->
+    <!-- AI RECOMMENDATION -->
     <div style="background:#fff8e1;border-left:4px solid #ffc107;border-radius:0 8px 8px 0;padding:18px;margin-top:25px">
-      <p style="color:#856404;font-weight:bold;margin:0 0 8px;font-size:0.95rem">
-        Action recommandee par l'IA (Claude API)
-      </p>
-      <p style="color:#533f03;margin:0;line-height:1.7;font-size:0.9rem">
-        {action}
-      </p>
+      <p style="color:#856404;font-weight:bold;margin:0 0 8px;font-size:0.95rem">Recommandation IA (Claude API)</p>
+      <p style="color:#533f03;margin:0;line-height:1.7;font-size:0.9rem">{action}</p>
     </div>
 
     <!-- PIPELINE STATUS -->
     <div style="background:#e8f5e9;border-left:4px solid #4caf50;border-radius:0 8px 8px 0;padding:18px;margin-top:18px">
-      <p style="color:#1b5e20;font-weight:bold;margin:0 0 10px;font-size:0.95rem">
-        Pipeline Detection as Code - Etapes executees
-      </p>
+      <p style="color:#1b5e20;font-weight:bold;margin:0 0 10px;font-size:0.95rem">Pipeline Detection as Code - Etapes executees</p>
       <table style="width:100%;font-size:0.85rem">
-        <tr>
-          <td style="padding:4px 0;color:#2e7d32">OK</td>
-          <td style="padding:4px 8px;color:#212529">Wazuh a detecte l'attaque en temps reel</td>
-        </tr>
-        <tr>
-          <td style="padding:4px 0;color:#2e7d32">OK</td>
-          <td style="padding:4px 8px;color:#212529">Claude AI a analyse et classifie la menace</td>
-        </tr>
-        <tr>
-          <td style="padding:4px 0;color:#2e7d32">OK</td>
-          <td style="padding:4px 8px;color:#212529">Regle XML generee et versionnee sur GitHub</td>
-        </tr>
-        <tr>
-          <td style="padding:4px 0;color:#2e7d32">OK</td>
-          <td style="padding:4px 8px;color:#212529">GitHub Actions - Validation syntaxe XML</td>
-        </tr>
-        <tr>
-          <td style="padding:4px 0;color:#2e7d32">OK</td>
-          <td style="padding:4px 8px;color:#212529">Deploiement automatique sur Wazuh (self-hosted runner)</td>
-        </tr>
-        <tr>
-          <td style="padding:4px 0;color:#2e7d32">OK</td>
-          <td style="padding:4px 8px;color:#212529">Ce rapport envoye automatiquement a l'ingenieur SOC</td>
-        </tr>
+        <tr><td style="padding:4px 0;color:#2e7d32">✅</td><td style="padding:4px 8px;color:#212529">Wazuh a detecte l'attaque en temps reel</td></tr>
+        <tr><td style="padding:4px 0;color:#2e7d32">✅</td><td style="padding:4px 8px;color:#212529">Claude AI a analyse et classifie la menace</td></tr>
+        <tr><td style="padding:4px 0;color:#2e7d32">✅</td><td style="padding:4px 8px;color:#212529">Regle XML generee et versionnee sur GitHub</td></tr>
+        <tr><td style="padding:4px 0;color:#2e7d32">✅</td><td style="padding:4px 8px;color:#212529">GitHub Actions - Validation syntaxe XML</td></tr>
+        <tr><td style="padding:4px 0;color:#2e7d32">✅</td><td style="padding:4px 8px;color:#212529">Deploiement automatique sur Wazuh (self-hosted runner)</td></tr>
+        <tr><td style="padding:4px 0;color:#2e7d32">✅</td><td style="padding:4px 8px;color:#212529">Ce rapport envoye automatiquement a l'ingenieur SOC</td></tr>
       </table>
+    </div>
+
+    <!-- ACTIONS BUTTONS -->
+    <div style="background:#fce4ec;border-left:4px solid #dc3545;border-radius:0 8px 8px 0;padding:18px;margin-top:18px">
+      <p style="color:#b71c1c;font-weight:bold;margin:0 0 12px;font-size:0.95rem">Actions disponibles pour l'analyste SOC</p>
+      <div style="text-align:center">
+        <a href="{FLASK_URL}/api/unblock/{srcip}"
+           style="display:inline-block;background:#198754;color:white;padding:11px 22px;border-radius:6px;text-decoration:none;font-size:0.9rem;margin:5px">
+           Debloquer l'IP {srcip}
+        </a>
+        <a href="https://ipinfo.io/{srcip}"
+           style="display:inline-block;background:#0d6efd;color:white;padding:11px 22px;border-radius:6px;text-decoration:none;font-size:0.9rem;margin:5px">
+           Infos sur l'IP
+        </a>
+        <a href="{FLASK_URL}/api/blocked"
+           style="display:inline-block;background:#6c757d;color:white;padding:11px 22px;border-radius:6px;text-decoration:none;font-size:0.9rem;margin:5px">
+           IPs bloquees
+        </a>
+      </div>
     </div>
 
     <!-- LINKS -->
@@ -199,7 +176,7 @@ def send_attack_report(detection: dict) -> bool:
     <p style="color:#8892b0;margin:0;font-size:0.8rem;line-height:1.6">
       Genere automatiquement par le systeme SOC AI<br>
       PFE 2026 - AI Empowered Detection as Code<br>
-      Claude API (claude-sonnet-4-5) | Wazuh v4.7.5 | GitHub Actions CI/CD
+      Claude API (claude-sonnet-4-6) | Wazuh v4.7.5 | GitHub Actions CI/CD
     </p>
   </div>
 
@@ -213,33 +190,30 @@ def send_attack_report(detection: dict) -> bool:
         msg['From']    = EMAIL_FROM
         msg['To']      = EMAIL_TO
         msg.attach(MIMEText(html_body, 'html', 'utf-8'))
-
         with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
             server.ehlo()
             server.starttls()
             server.login(EMAIL_FROM, EMAIL_PASS)
             server.sendmail(EMAIL_FROM, [EMAIL_TO], msg.as_string())
-
         print(f"[EMAIL] Rapport envoye : {attack_type} depuis {srcip}")
         return True
-
     except Exception as e:
         print(f"[EMAIL] Erreur envoi : {e}")
         return False
 
 
 if __name__ == '__main__':
-    # Test avec une fausse alerte
     test = {
         'timestamp':   datetime.now().isoformat(),
         'category':    'brute_force_ssh',
         'attack_type': 'Brute Force SSH',
         'severity':    'CRITIQUE',
-        'srcip':       '192.168.1.139',
-        'description': 'sshd: brute force trying to get access to the system',
-        'action':      "Bloquer immediatement l'IP 192.168.1.139 au niveau du firewall et auditer le compte root pour verifier toute compromission.",
-        'rule_file':   'llm_brute_force_ssh_test.xml'
+        'srcip':       '192.168.1.158',
+        'description': 'BRUTE FORCE SSH - 8 echecs Failed password en 120s',
+        'action':      "Bloquer immediatement l'IP 192.168.1.158 au niveau du firewall et auditer le compte root.",
+        'rule_file':   'llm_brute_force_ssh_test.xml',
+        'auto_action': 'IP 192.168.1.158 bloquee automatiquement pendant 60 minutes (severite CRITIQUE)'
     }
     print("Envoi du rapport test...")
     result = send_attack_report(test)
-    print("Succes !" if result else "Echec - verifie EMAIL_PASS dans le fichier")
+    print("Succes !" if result else "Echec")

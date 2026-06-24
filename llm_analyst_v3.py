@@ -468,6 +468,15 @@ def process(alert: dict):
         # Email automatique ingenieur SOC
         if EMAIL_ENABLED:
             try:
+                # Détermine l'action automatique effectuée
+                sev = result.get("severite", "")
+                if sev == "CRITIQUE":
+                    auto_act = f"IP {srcip} bloquee automatiquement pendant 60 minutes (severite CRITIQUE)"
+                elif sev == "HAUTE":
+                    auto_act = f"IP {srcip} bloquee automatiquement pendant 15 minutes (severite HAUTE)"
+                else:
+                    auto_act = "Aucune action automatique - notification uniquement"
+
                 send_attack_report({
                     "timestamp": datetime.now().isoformat(),
                     "category": category,
@@ -476,7 +485,8 @@ def process(alert: dict):
                     "srcip": srcip,
                     "description": alert.get("rule", {}).get("description", ""),
                     "action": result.get("action", ""),
-                    "rule_file": rule_filename
+                    "rule_file": rule_filename,
+                    "auto_action": auto_act
                 })
                 print(f"  [EMAIL] Rapport envoye a l ingenieur SOC")
             except Exception as e:
