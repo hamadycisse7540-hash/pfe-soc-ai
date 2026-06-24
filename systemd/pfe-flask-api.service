@@ -1,0 +1,17 @@
+[Unit]
+Description=PFE SOC - Flask API (Block/Unblock IP)
+After=wazuh-manager.service
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/pfe_soc
+EnvironmentFile=/home/ubuntu/pfe_soc/.env
+Environment="PYTHONUNBUFFERED=1"
+ExecStart=/home/ubuntu/ml_env/bin/python3 /home/ubuntu/pfe_soc/flask_api.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
