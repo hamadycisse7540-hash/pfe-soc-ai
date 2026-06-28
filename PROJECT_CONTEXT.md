@@ -3,9 +3,9 @@
 
 ### Identité
 - Titre : AI Empowered Detection as Code for Advanced and Time-Efficient Threat Detection in a SOC Environment
-- Étudiant : Hamady Cissé — UAE — Stage NUMEA
-- GitHub : https://github.com/hamadycisse7540-hash/pfe-soc-ai
-- Email : hamady.cisse@etu.uae.ac.ma
+- Étudiant : Stage NUMEA
+- GitHub : https://github.com/[username]/pfe-soc-ai
+- Email : [email confidentiel]
 
 ### Infrastructure
 - Ubuntu 22.04 Manager : 192.168.1.132 — Wazuh v4.7.5
