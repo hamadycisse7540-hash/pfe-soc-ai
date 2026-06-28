@@ -2,177 +2,243 @@
 
 ## 1. Vue d'ensemble
 
-Ce projet met en place un **SOC virtuel** complet, où la détection de menaces est automatisée par un LLM (Claude API), et où chaque règle de détection est gérée comme du code (*Detection as Code*).
+Ce projet met en place un SOC virtuel complet où la détection de menaces est automatisée par un LLM (Claude API), et où chaque règle de détection est gérée comme du code (Detection as Code).
 
 L'objectif est de démontrer qu'un LLM peut :
-1. **Analyser** dynamiquement les alertes de sécurité d'un SIEM (Wazuh) ;
-2. **Identifier** le type d'attaque (catégorie MITRE ATT&CK, sévérité, IP source) ;
-3. **Générer** automatiquement une règle XML compatible Wazuh ;
-4. **Déployer** cette règle via un pipeline CI/CD (GitHub Actions).
+
+- Analyser dynamiquement les alertes de sécurité d'un SIEM (Wazuh) ;
+- Identifier le type d'attaque (catégorie MITRE ATT&CK, sévérité, IP source) ;
+- Déclencher une réponse graduée automatique (blocage temporaire, email SOC) ;
+- Générer automatiquement une règle XML compatible Wazuh ;
+- Déployer cette règle via un pipeline CI/CD (GitHub Actions).
 
 ## 2. Topologie du laboratoire
+┌─────────────────────────┐         ┌─────────────────────────────────────┐
 
-```
-┌─────────────────────────┐         ┌─────────────────────────────────┐
-│   Kali Linux            │         │   Wazuh Manager Ubuntu          │
-│   (192.168.1.x)         │ ──────▶ │   (192.168.1.132)               │
-│                         │ attaque │                                 │
-│   - hydra (SSH brute)   │         │   - wazuh-manager v4.7.5        │
-│   - nmap (scan)         │         │   - wazuh-indexer (OpenSearch)  │
-│   - nikto / sqlmap      │         │   - wazuh-dashboard             │
-│   - hping3 (DoS)        │         │   - filebeat                    │
-│                         │         │   - wazuh-agent (auto-monitor)  │
-│   wazuh-agent installé  │         │   - Apache (cible web)          │
-└─────────────────────────┘         │   - OpenSSH (cible SSH)         │
-                                    │                                 │
-                                    │   Services PFE :                │
-                                    │   - pfe-llm-analyst.service     │
-                                    │   - pfe-nmap-watcher.service    │
-                                    │   - pfe-soc-dashboard.service   │
-                                    │   - flask_api.py (port 8080)    │
-                                    └────────────┬────────────────────┘
-                                                 │
-                                                 ▼
-                                    ┌─────────────────────────────────┐
-                                    │   GitHub                        │
-                                    │   hamadycisse7540-hash/         │
-                                    │     pfe-soc-ai                  │
-                                    │                                 │
-                                    │   - rules/custom/*.xml          │
-                                    │   - .github/workflows/          │
-                                    │     (validation CI/CD)          │
-                                    │   - self-hosted runner          │
-                                    │     sur le manager              │
-                                    └─────────────────────────────────┘
-```
+│   Kali Linux            │         │   Ubuntu Manager (192.168.1.132)    │
 
-## 3. Pipeline de détection (Detection as Code)
+│   (192.168.1.158 DHCP)  │ ──────▶ │                                     │
 
-### Étapes complètes, du paquet réseau à la règle déployée
+│                         │ attaque │   Wazuh Manager v4.7.5              │
 
-```
-1.  [Kali]      Attaquant lance une attaque
-                ex : hydra -l root -P rockyou.txt ssh://192.168.1.132
+│   - hydra (SSH brute)   │         │   Wazuh Indexer (OpenSearch)        │
 
-2.  [Manager]   OpenSSH journalise les tentatives d'auth
-                /var/log/auth.log : "Failed password for root from x.x.x.x"
+│   - nmap (SYN scan)     │         │   Wazuh Dashboard (https://:443)    │
 
-3.  [Wazuh Agent → Manager]
-                Lecture en temps réel par filebeat → wazuh-manager
-                Décodeur SSH applique les règles built-in
+│   - nikto (web scan)    │         │   Filebeat                          │
 
-4.  [Wazuh]     Génère une alerte JSON dans /var/ossec/logs/alerts/alerts.json
-                {
-                  "rule": {"level": 10, "id": 5712, ...},
-                  "data": {"srcip": "...", "srcuser": "root"},
-                  "agent": {...}
-                }
+│   - hping3 / inject     │         │   Apache HTTP Server                │
 
-5.  [pfe-llm-analyst.service]
-                Service systemd qui tail -f alerts.json
-                → filtre les alertes de niveau ≥ 8
-                → envoie le contexte de l'alerte à Claude API
+│                         │         │   OpenSSH Server                    │
 
-6.  [Claude API]
-                Reçoit le prompt :
-                "Tu es un analyste SOC. Analyse cette alerte Wazuh,
-                identifie le type d'attaque (catégorie MITRE),
-                la sévérité (low/medium/high/critical),
-                l'IP source, et génère une règle XML Wazuh
-                qui détecterait ce pattern à l'avenir."
-                → retourne une règle XML
+│   wazuh-agent ID 001    │         │                                     │
 
-7.  [pfe-llm-analyst]
-                Sauvegarde la règle dans :
-                /var/ossec/etc/rules/llm_<categorie>_<id>.xml
-                ET
-                ~/pfe_soc/github/rules/custom/llm_<categorie>_<id>.xml
+│   Active                │         │   Services PFE :                    │
 
-8.  [Git push]  Auto-commit + push vers le dépôt GitHub
+└─────────────────────────┘         │   pfe-llm-analyst.service           │
 
-9.  [GitHub Actions]
-                Workflow déclenché → validate XML syntax
-                → lint Wazuh rules
-                → si OK : merge auto possible
+│   pfe-nmap-watcher.service          │
 
-10. [Wazuh]     Restart manager → la nouvelle règle est active
-                → la prochaine occurrence du pattern est détectée
-                   directement par Wazuh, sans appel LLM
-```
+│   pfe-flask-api.service (port 8080) │
 
-### Boucle d'apprentissage
+└────────────┬────────────────────────┘
 
-Le système devient **plus performant avec le temps** :
-- Les premières alertes d'un type donné déclenchent un appel LLM (coûteux).
-- Une fois la règle générée et déployée, les occurrences suivantes sont détectées par Wazuh directement (gratuit, latence ms).
-- Le LLM n'est sollicité que pour des **patterns nouveaux ou inconnus**.
+│
 
+▼
+
+┌─────────────────────────────────────┐
+
+│   GitHub                            │
+
+│   [username]/pfe-soc-ai             │
+
+│                                     │
+
+│   rules/custom/*.xml                │
+
+│   .github/workflows/deploy.yml      │
+
+│   self-hosted runner (sur manager)  │
+
+└─────────────────────────────────────┘
+[Kali]         Attaquant lance une attaque
+
+ex : hydra -l root -P rockyou.txt ssh://192.168.1.132
+[OpenSSH]      Journalise les tentatives
+
+"Failed password for root from 192.168.1.158 port 35304 ssh2"
+[Wazuh]        Décodeur SSH + règles built-in
+
+Règle 100010 (échec SSH) → 8x en 120s → Règle 100003 (Brute Force, level 14)
+[alerts.json]  Alerte JSON générée :
+
+{
+
+"rule": {"level": 14, "id": "100003", "description": "BRUTE FORCE SSH"},
+
+"data": {"srcip": "192.168.1.158", "dstuser": "root"},
+
+"agent": {"id": "001", "name": "kali"}
+
+}
+[pfe-llm-analyst]  Service systemd surveille alerts.json (tail seek)
+
+Filtre niveau >= 8, catégorise via ATTACK_CATEGORIES
+[Claude API]   claude-sonnet-4-6, max_tokens=400
+
+→ JSON : type, severite, action, niveau_regle, parent_sid, description_regle
+[Réponse graduée Human-in-the-Loop]
+
+CRITIQUE → iptables -I INPUT -s IP -j DROP (60 min auto-unblock)
+
++ Email SOC + Règle XML
+
+HAUTE    → iptables -I INPUT -s IP -j DROP (15 min auto-unblock)
+
++ Email SOC + Règle XML
+
+MOYENNE  → Email SOC + Règle XML
+[Génération XML]   Template par catégorie → ID unique auto-incrémenté
+
+Validation : wazuh-analysisd -t
+
+Déploiement : /var/ossec/etc/rules/llm_*.xml
+
+restart wazuh-manager
+[GitHub]       Commit automatique : "LLM auto-rule: brute_force_ssh [20260618_003430]"
+[GitHub Actions]  deploy.yml déclenché sur push rules/**
+
+Job validate : xmllint + test_rules.py (IDs uniques)
+
+Job deploy : self-hosted runner → cp + restart Wazuh
+[Email SOC]   Rapport HTML enrichi :
+
+- Sévérité + bannière avertissement
+
+- IP source + lien ipinfo.io
+
+- Action effectuée automatiquement
+
+- Recommandation IA (Claude API)
+
+- Boutons : Débloquer IP / Infos IP / IPs bloquées
+### Boucle d'apprentissage Detection as Code
+1ère occurrence d'une catégorie
+
+↓
+
+Appel LLM (~4s) → règle XML générée
+
+↓
+
+Règle déployée dans Wazuh
+
+↓
+
+2ème occurrence et suivantes
+
+↓
+
+Détection directe par Wazuh (latence ms, 0 coût API)
 ## 4. Composants
 
 ### 4.1 Wazuh
 
-- **wazuh-manager v4.7.5** : SIEM central, applique les décodeurs et les règles.
-- **wazuh-indexer** : OpenSearch backend (stockage des alertes).
-- **wazuh-dashboard** : UI web sur `https://192.168.1.132`.
-- **filebeat** : transport des alertes vers l'indexer.
-- **wazuh-agent** sur Kali et sur le manager lui-même.
+| Composant | Rôle |
+|-----------|------|
+| wazuh-manager v4.7.5 | SIEM central — décodeurs + règles |
+| wazuh-indexer | OpenSearch backend (stockage alertes) |
+| wazuh-dashboard | UI web — https://192.168.1.132 |
+| filebeat | Transport alertes vers indexer |
+| wazuh-agent (Kali, ID 001) | Supervision machine attaquante |
 
 ### 4.2 Services PFE (systemd)
 
 | Service | Fichier | Rôle |
 |---------|---------|------|
-| `pfe-llm-analyst.service` | `llm_analyst_v3.py` | Lit `alerts.json`, appelle Claude, génère/déploie règles |
-| `pfe-nmap-watcher.service` | `nmap_watcher.py` | Lit iptables LOG, détecte les patterns Nmap (SYN scan, etc.) |
-| `pfe-soc-dashboard.service` | `soc_dashboard.py` | Dashboard local des détections (port à confirmer) |
+| pfe-llm-analyst.service | llm_analyst_v3.py | Analyse LLM + Human-in-the-Loop SOAR |
+| pfe-nmap-watcher.service | nmap_watcher.py | Détection Nmap via kern.log + iptables |
+| pfe-flask-api.service | flask_api.py | API REST + Dashboard SOC IP Management |
 
-### 4.3 API Flask (`flask_api.py`)
+### 4.3 API Flask (port 8080)
 
-REST API sur port `8080` exposant :
-- `GET /api/stats` — statistiques de détection
-- `GET /` — health check
-- (autres endpoints à documenter dans le code)
+| Méthode | Endpoint | Description |
+|---------|----------|-------------|
+| GET | /dashboard | Dashboard SOC IP Management |
+| GET | /api/stats | Statistiques de détection |
+| GET | /api/blocked | IPs bloquées (iptables) |
+| GET | /api/top-ips | Top 10 IPs attaquantes |
+| GET | /api/rules-count | Règles LLM déployées sur Wazuh |
+| POST | /api/block/\<ip\> | Blocage manuel analyste SOC |
+| POST | /api/unblock/\<ip\> | Déblocage analyste SOC |
 
-### 4.4 Détection ML (`ai_detector_v3.py` + `train_model_v2.py`)
+### 4.4 Human-in-the-Loop SOAR
+Sévérité    Action automatique              Validation humaine
 
-Modèle **Random Forest** entraîné sur **CICIDS2017** :
-- Features : statistiques de flux réseau (durée, taille paquets, flags TCP, etc.)
-- Classes : Benign, DoS, DDoS, PortScan, BruteForce, WebAttack, Infiltration
-- Artéfacts : `models/model_v2.pkl`, `models/features_v2.json`
+─────────   ──────────────────────────────  ─────────────────
 
-Ce composant est complémentaire au LLM : il permet une détection **précoce** sur le trafic brut, avant même que Wazuh ne génère une alerte.
+CRITIQUE    iptables DROP 60min + Email     Requise via email
 
-## 5. Dépôt "Detection as Code" (`github/`)
+HAUTE       iptables DROP 15min + Email     Non requise
 
-```
-github/
-├── README.md
-├── rules/
-│   ├── custom/           # règles générées par LLM + curées
-│   ├── local_rules.xml   # règles locales Wazuh
-│   └── tests/            # tests des règles (wazuh-logtest)
-├── scripts/              # copies déployables des scripts root
-├── models/               # features.json (référence)
-└── docs/
-```
+MOYENNE     Email uniquement                Non requise
 
-Ce dossier est un **vrai dépôt Git** distinct, poussé sur GitHub. Sa CI/CD valide chaque règle.
+FAIBLE      Email uniquement                Non requise
+Déblocage analyste : `POST http://192.168.1.132:8080/api/unblock/<ip>`
 
-## 6. Sécurité et bonnes pratiques
+## 5. Règles statiques (8 fichiers, 16 IDs, MITRE ATT&CK)
 
-- **Clé API Anthropic** : actuellement en clair dans `start_demo.sh` et dans le service systemd. À sortir vers un `.env` ou `Environment=file:/etc/pfe/secrets.env` pour le rendu final.
-- **iptables** : le script `start_demo.sh` flush les règles iptables. À reconsidérer en prod.
-- **Self-hosted runner** : tourne sur le manager. Risque : un PR malveillant peut exécuter du code sur le manager. Acceptable en démo PFE, pas en prod.
+| Fichier | IDs | Attaque | Match | MITRE |
+|---------|-----|---------|-------|-------|
+| rule_100001 | 100009 | SSH Invalid user | Invalid user | T1110.003 |
+| rule_100002 | 100002 | Nmap scan | IPTABLES-DROP freq=18/45s | T1046 |
+| rule_100003 | 100010+100003 | Brute Force SSH | Failed password × 8/120s | T1110 |
+| rule_100004 | 100004 | SQL Injection | sqlmap/UNION SELECT | T1190 |
+| rule_100005 | 100005 | Web Scanner | nikto/sqlmap/nmap | T1595.003 |
+| rule_100006 | 100006 | Sudo root | USER=root (!ubuntu) | T1548.003 |
+| rule_100007 | 100007 | Auth failure PAM | authentication failure | T1110 |
+| rule_100008 | 100008 | New user created | useradd/adduser | T1136.001 |
 
-## 7. Limites et perspectives
+## 6. Résultats expérimentaux (session 18 juin 2026)
 
-### Limites actuelles
-- Les règles générées par LLM ne sont pas systématiquement testées avec `wazuh-logtest` avant déploiement.
-- Le LLM peut générer des règles redondantes ou conflictuelles.
-- Coût des appels API si volume d'alertes important.
+| Scénario | Heure détection | Heure déploiement | Délai | Sévérité | MITRE |
+|----------|----------------|-------------------|-------|---------|-------|
+| Nmap scan | 00:27:39 | 00:28:01 | 22s | HAUTE | T1046 |
+| SSH Brute Force | 00:34:27 | 00:34:47 | 20s | CRITIQUE | T1110 |
+| Web scan CGI | 00:40:40 | 00:41:03 | 23s | HAUTE | T1190 |
+| Shellshock | 00:41:07 | 00:41:46 | 39s | CRITIQUE | T1059 |
+| DoS SYN Flood | 00:49:30 | 00:49:55 | 25s | CRITIQUE | T1498 |
+| Privilege Escalation | 00:50:15 | 00:50:40 | 25s | CRITIQUE | T1548 |
 
-### Pistes d'amélioration
-- Cache de prompts (Anthropic prompt caching) → réduit le coût.
-- Déduplication des règles par signature.
-- Pipeline de validation : `wazuh-logtest` avant commit.
-- Modèle ML local en première ligne, LLM uniquement sur les cas incertains.
-- Feedback loop : annoter les faux positifs pour affiner les prompts.
+**Temps moyen : 26 secondes** (alerte détectée → règle déployée + email + GitHub)
+
+## 7. Anti-doublon
+
+- Clé de déduplication : `(category,)` → 1 seule règle LLM par catégorie par session
+- Cache persistant : `.seen_categories.json`
+- Vérification fichiers `llm_{category}_*.xml` existants dans `/var/ossec/etc/rules/`
+- Reset avant démo : `rm -f .seen_categories.json`
+
+## 8. Sécurité et bonnes pratiques
+
+- Clé API Anthropic : stockée dans `.env` (EnvironmentFile systemd), jamais en dur
+- `.seen_categories.json` et `*.db-journal` exclus du repo via `.gitignore`
+- Self-hosted runner : tourne sur le manager (acceptable en démo PFE)
+- Active Response Wazuh configuré pour les règles 100002, 100003, 100005, 100006
+- Déblocage automatique via `Popen bash` détaché (CRITIQUE=3600s, HAUTE=900s)
+
+## 9. Limites et perspectives
+
+### Limites actuelles (acceptables pour un PFE)
+- Catégorie `default` fourre-tout (Shellshock + autres non catégorisés)
+- Déblocage via `Popen sleep + iptables` (thread non persistant au redémarrage)
+- Email simple (pas de ticket ITSM)
+- Active Response graphique limitée (alertes sur agent 000 = manager local)
+
+### Améliorations futures (production)
+- `firewall-cmd --timeout` ou `nftables sets` avec expiration native
+- SOAR professionnel (Cortex XSOAR, Shuffle, Splunk SOAR)
+- Tickets ITSM (ServiceNow, Jira) au lieu d'email
+- Wazuh Active Response natif pour agents distants
+- Interface dashboard "Blocked IP List" avec historique et audit trail complet
