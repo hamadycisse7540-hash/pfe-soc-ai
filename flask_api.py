@@ -143,6 +143,29 @@ def blocked_ips():
             ips.append(parts[3])
     return jsonify({"blocked_ips": ips, "count": len(ips)})
 
+
+
+# ============================================================
+# SOC Dashboard et règles LLM
+# ============================================================
+import glob as _glob
+from flask import render_template_string as _rts
+
+@app.route('/dashboard')
+def soc_dashboard():
+    try:
+        html = open('/home/ubuntu/pfe_soc/soc_dashboard.py').read()
+        return html
+    except Exception as e:
+        return f"<h1>Erreur: {e}</h1>", 500
+
+@app.route('/api/rules-count')
+def rules_count():
+    rules = _glob.glob('/var/ossec/etc/rules/llm_*.xml')
+    names = [r.split('/')[-1] for r in sorted(rules)]
+    return jsonify({'count': len(rules), 'rules': names})
+
+
 if __name__ == '__main__':
     print(f"[{datetime.now()}] API Flask SOC démarrée sur http://0.0.0.0:8080")
     app.run(host='0.0.0.0', port=8080, debug=False)
@@ -214,18 +237,3 @@ def block_ip_manual(ip):
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
-# ============================================================
-# SOC IP Management Dashboard
-# ============================================================
-from flask import render_template_string as _rts
-import glob as _glob
-
-@app.route('/dashboard')
-def soc_dashboard():
-    return _rts(open('/home/ubuntu/pfe_soc/soc_dashboard.py').read().split("DASHBOARD_HTML = '''")[1].split("'''")[0])
-
-@app.route('/api/rules-count')
-def rules_count():
-    rules = _glob.glob('/var/ossec/etc/rules/llm_*.xml')
-    return jsonify({'count': len(rules), 'rules': [r.split('/')[-1] for r in rules]})
