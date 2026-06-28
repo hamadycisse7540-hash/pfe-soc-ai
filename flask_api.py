@@ -214,3 +214,18 @@ def block_ip_manual(ip):
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+# ============================================================
+# SOC IP Management Dashboard
+# ============================================================
+from flask import render_template_string as _rts
+import glob as _glob
+
+@app.route('/dashboard')
+def soc_dashboard():
+    return _rts(open('/home/ubuntu/pfe_soc/soc_dashboard.py').read().split("DASHBOARD_HTML = '''")[1].split("'''")[0])
+
+@app.route('/api/rules-count')
+def rules_count():
+    rules = _glob.glob('/var/ossec/etc/rules/llm_*.xml')
+    return jsonify({'count': len(rules), 'rules': [r.split('/')[-1] for r in rules]})
