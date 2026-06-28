@@ -1,65 +1,113 @@
 # PFE SOC — AI Empowered Detection as Code
 
 ## Sujet
-**AI Empowered Detection as a Code for an advanced, time efficient and last trending threat detection in a SOC environment**
+AI Empowered Detection as Code for Advanced and Time-Efficient Threat Detection in a SOC Environment
 
 ## Architecture
 Kali Linux (Attaquant)
-↓ SSH Brute Force / Nmap / Web Attack / DoS / Privilege Escalation
+
+↓ Nmap / Hydra / Nikto / DoS / PrivEsc
+
 Wazuh Agent v4.7.5
+
 ↓ logs temps réel
-Wazuh Manager + OpenSearch + Dashboard
+
+Wazuh Manager + OpenSearch + Dashboard (192.168.1.132)
+
 ↓ alerts.json (surveillance continue)
-pfe-llm-analyst.service (Claude API - Anthropic claude-sonnet-4-5)
-↓ analyse contextuelle comme un analyste SOC
-Génération règle XML Wazuh (avec queries de détection + MITRE ATT&CK)
-↓ commit automatique
-GitHub Repository (Detection as Code)
+
+pfe-llm-analyst.service
+
+↓ Claude API claude-sonnet-4-6 (~4s)
+
+Classification + Réponse graduée :
+
+CRITIQUE → iptables DROP 60min + Email SOC
+
+HAUTE    → iptables DROP 15min + Email SOC
+
+MOYENNE  → Email SOC uniquement
+
 ↓
+
+Génération règle XML (MITRE ATT&CK + PCI DSS + GDPR)
+
+↓ commit automatique
+
+GitHub Repository (Detection as Code)
+
+↓
+
 GitHub Actions CI/CD
+
 ├── Validate Rules (ubuntu-latest) — xmllint + test_rules.py
+
 └── Deploy to Wazuh (self-hosted runner) — cp + systemctl restart
+
+↓
+
+Email HTML → Ingénieur SOC (ipinfo.io + boutons block/unblock)
 ## Composants
 
 | Composant | Description |
 |-----------|-------------|
 | Wazuh Manager v4.7.5 | SIEM - collecte et corrèle les alertes |
-| Claude API (claude-sonnet-4-5) | LLM - analyse et génère les règles |
-| pfe-llm-analyst.service | Service systemd - surveillance 24h/24 |
-| pfe-nmap-watcher.service | Détection scan Nmap via iptables |
-| pfe-soc-dashboard.service | API REST SQLite - stats + blocage IP |
-| GitHub Actions | CI/CD - validation syntaxe + déploiement |
-| report_sender.py | Email HTML automatique à l'ingénieur SOC |
+| Claude API (claude-sonnet-4-6) | LLM - analyse contextuelle + génération règles |
+| pfe-llm-analyst.service | Moteur LLM - surveillance 24h/24 |
+| pfe-nmap-watcher.service | Détection scan Nmap via kern.log + iptables |
+| pfe-flask-api.service | API REST + Dashboard SOC IP Management (port 8080) |
+| GitHub Actions | CI/CD - validation syntaxe XML + déploiement |
+| report_sender.py | Email HTML enrichi - ipinfo.io + auto_action + boutons SOC |
 
 ## Types d'attaques détectées
 
-| Attaque | Outil Kali | Règle MITRE |
-|---------|------------|-------------|
-| Brute Force SSH | Hydra | T1110 |
-| Scan réseau Nmap | Nmap | T1046 |
-| Web Attack / Nikto | Nikto | T1190 |
-| Shellshock CVE-2014-6271 | Nikto | T1059 |
-| DoS SYN Flood | Injection | T1498 |
-| Privilege Escalation | sudo/su | T1548.003 |
+| Attaque | Outil Kali | Catégorie | MITRE | Délai moyen |
+|---------|-----------|-----------|-------|------------|
+| Brute Force SSH | Hydra | brute_force_ssh | T1110 | 20s |
+| Scan réseau Nmap | Nmap | nmap_scan | T1046 | 22s |
+| Web Attack / CGI | Nikto | web_attack | T1190 | 23s |
+| Shellshock CVE-2014-6271 | Nikto | default | T1059 | 39s |
+| DoS SYN Flood | Injection | dos_attack | T1498 | 25s |
+| Privilege Escalation | sudo/su | privilege_escalation | T1548.003 | 25s |
 
-## Pipeline Detection as Code
-Attaque détectée par Wazuh (niveau >= 8)
-pfe-llm-analyst lit alerts.json en temps réel
-Claude API analyse : type, sévérité, IP source, action
-Règle XML générée avec :
+**Temps moyen de réponse : 26 secondes** (alerte détectée → règle déployée + email + GitHub)
 
-frequency + timeframe (corrélation temporelle)
-same_source_ip (corrélation par IP)
-match/if_matched_sid (query de détection)
-MITRE ATT&CK (mapping tactique)
-PCI DSS / GDPR compliance tags
+## Règles statiques Wazuh (8 fichiers, 16 IDs)
 
+| ID | Attaque | MITRE |
+|----|---------|-------|
+| 100009 | SSH Invalid user | T1110.003 |
+| 100002 | Nmap scan (freq=18/45s) | T1046 |
+| 100010 | SSH Failed password | T1110.001 |
+| 100003 | Brute Force SSH (8 échecs/120s) | T1110 |
+| 100004 | SQL Injection | T1190 |
+| 100005 | Web Scanner (nikto/sqlmap) | T1595.003 |
+| 100006 | Sudo root (!ubuntu) | T1548.003 |
+| 100007 | Auth failure PAM | T1110 |
+| 100008 | New user created | T1136.001 |
 
-Wazuh Manager rechargé automatiquement
-Commit GitHub automatique
-GitHub Actions : Validate Rules ✅
-GitHub Actions : Deploy to Wazuh ✅ (self-hosted runner)
-Email rapport HTML → ingénieur SOC
+## Human-in-the-Loop SOAR
+Alerte Wazuh
+
+↓
+
+LLM Analyst (Claude API ~4s)
+
+↓
+
+CRITIQUE → Blocage auto 60min + Email + Règle XML
+
+HAUTE    → Blocage auto 15min + Email + Règle XML
+
+MOYENNE  → Email + Règle XML
+
+↓
+
+Analyste SOC valide via Dashboard ou email
+
+↓
+
+Déblocage : POST /api/unblock/<ip>
 ## Installation
 
 ```bash
@@ -72,11 +120,15 @@ python3 -m venv ~/ml_env
 source ~/ml_env/bin/activate
 pip install anthropic flask flask-cors
 
+# Variables d'environnement
+cp .env.example .env
+# Editer .env : ANTHROPIC_API_KEY, EMAIL_FROM, EMAIL_PASS, EMAIL_TO
+
 # Services systemd
 sudo cp systemd/*.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable pfe-llm-analyst pfe-nmap-watcher
-sudo systemctl start pfe-llm-analyst pfe-nmap-watcher
+sudo systemctl enable pfe-llm-analyst pfe-nmap-watcher pfe-flask-api
+sudo systemctl start pfe-llm-analyst pfe-nmap-watcher pfe-flask-api
 ```
 
 ## Services systemd
@@ -84,18 +136,46 @@ sudo systemctl start pfe-llm-analyst pfe-nmap-watcher
 ```bash
 sudo systemctl status pfe-llm-analyst    # LLM analyst
 sudo systemctl status pfe-nmap-watcher   # Nmap detector
-sudo journalctl -u pfe-llm-analyst -f    # Logs en temps réel
+sudo systemctl status pfe-flask-api      # Flask API + Dashboard
+sudo journalctl -u pfe-llm-analyst -f    # Logs temps réel
 ```
 
-## API Endpoints (port 9000)
-GET  /api/stats          — Statistiques globales
-GET  /api/export/csv     — Export CSV des détections
-POST /api/block          — Bloquer une IP (iptables)
-DELETE /api/unblock/<ip> — Débloquer une IP
-POST /api/ingest         — Ingestion externe
+## API Endpoints (port 8080)
+
+| Méthode | Endpoint | Description |
+|---------|----------|-------------|
+| GET | /dashboard | Dashboard SOC IP Management |
+| GET | /api/stats | Statistiques de détection |
+| GET | /api/blocked | IPs bloquées (iptables) |
+| GET | /api/top-ips | Top 10 IPs attaquantes |
+| GET | /api/rules-count | Règles LLM déployées |
+| POST | /api/block/<ip> | Blocage manuel analyste |
+| POST | /api/unblock/<ip> | Déblocage analyste SOC |
+
+## Démo complète
+
+```bash
+# Reset propre
+cd ~/pfe_soc
+bash start_demo.sh
+
+# Depuis Kali (séquentiel, 90s entre chaque)
+nmap -sS -p 1-1000 192.168.1.132
+hydra -l root -P /usr/share/wordlists/rockyou.txt ssh://192.168.1.132 -t 4 -I
+nikto -h http://192.168.1.132
+
+# Injection DoS + PrivEsc
+python3 inject_alerts.py
+
+# Surveillance
+sudo journalctl -u pfe-llm-analyst -f
+```
+
 ## Infrastructure
 
-- **Ubuntu Manager** : 192.168.1.132 (Wazuh + LLM + Apache)
-- **Kali Attaquant** : 192.168.1.139 (Agent Wazuh)
-- **GitHub** : https://github.com/hamadycisse7540-hash/pfe-soc-ai
-- **GitHub Actions** : https://github.com/hamadycisse7540-hash/pfe-soc-ai/actions
+- Ubuntu Manager : 192.168.1.132 (Wazuh + LLM + Apache + Flask)
+- Kali Attaquant : 192.168.1.158 (Agent Wazuh ID 001)
+- Dashboard Wazuh : https://192.168.1.132
+- SOC Dashboard : http://192.168.1.132:8080/dashboard
+- GitHub : https://github.com/hamadycisse7540-hash/pfe-soc-ai
+- GitHub Actions : https://github.com/hamadycisse7540-hash/pfe-soc-ai/actions
