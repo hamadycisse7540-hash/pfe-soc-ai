@@ -181,7 +181,8 @@ def soc_dashboard():
 
 @app.route('/api/rules-count')
 def rules_count():
-    rules = _glob.glob('/var/ossec/etc/rules/llm_*.xml')
+    import glob
+    rules = glob.glob('/var/ossec/etc/rules/llm_*.xml')
     names = [r.split('/')[-1] for r in sorted(rules)]
     return jsonify({'count': len(rules), 'rules': names})
 
