@@ -1,0 +1,9 @@
+<group name="llm_generated,local,syslog,">
+<rule id="100050" level="12">
+  <if_sid>4100</if_sid>
+  <match>IPTABLES-DROP</match>
+  <description>LLM: Detection de scan Nmap par iptables indiquant une phase de reconnaissance active sur le reseau</description>
+  <mitre><id>T1046</id></mitre>
+  <group>scan_detection,reconnaissance,pci_dss_11.4,</group>
+</rule>
+</group>
