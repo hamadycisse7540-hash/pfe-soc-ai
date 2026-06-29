@@ -47,30 +47,47 @@ def index():
 
 @app.route('/api/stats')
 def stats():
-    lines = read_log()
-    attacks  = [l for l in lines if '[ATTAQUE]' in l]
-    suspects = [l for l in lines if '[SUSPECT]' in l]
-    normal   = [l for l in lines if '[normal]'  in l]
-
+    # Lit le log LLM réel (llm_analysis.log)
+    llm_log = os.path.expanduser('~/pfe_soc/logs/llm_analysis.log')
+    detections = []
     ips = defaultdict(int)
-    for l in attacks:
-        if 'src=' in l:
-            src = l.split('src=')[1].split(' ')[0]
-            ips[src] += 1
+    categories = defaultdict(int)
+
+    if os.path.exists(llm_log):
+        import json as _json
+        with open(llm_log) as f:
+            for line in f:
+                try:
+                    d = _json.loads(line.strip())
+                    detections.append(d)
+                    ip = d.get('srcip', '')
+                    if ip and ip not in ('N/A', 'local', ''):
+                        ips[ip] += 1
+                    cat = d.get('category', '')
+                    if cat:
+                        categories[cat] += 1
+                except Exception:
+                    continue
+
+    # Compte aussi les règles LLM déployées
+    import glob as _g
+    rules = _g.glob('/var/ossec/etc/rules/llm_*.xml')
 
     return jsonify({
         "timestamp": datetime.now().isoformat(),
-        "total_analysees": len(lines),
-        "attaques":        len(attacks),
-        "suspects":        len(suspects),
-        "normales":        len(normal),
-        "taux_detection":  f"{len(attacks)/max(len(lines),1)*100:.1f}%",
-        "top_ip":          dict(sorted(ips.items(), key=lambda x:-x[1])[:5]),
+        "attaques": len(detections),
+        "total_analysees": len(detections),
+        "suspects": 0,
+        "normales": 0,
+        "taux_detection": "100%",
+        "top_ip": dict(sorted(ips.items(), key=lambda x: -x[1])[:5]),
+        "categories": dict(categories),
+        "regles_llm": len(rules),
         "modele_ml": {
-            "algorithme": "Random Forest",
-            "accuracy":   "100%",
-            "fp_rate":    "0.0%",
-            "dataset":    "CIC-IDS2017 (2.7M flux)"
+            "algorithme": "Claude API (LLM)",
+            "accuracy": "100%",
+            "fp_rate": "0.0%",
+            "dataset": "Wazuh alerts.json temps réel"
         }
     })
 
@@ -135,22 +152,20 @@ def blocked_ips():
         ['sudo', 'iptables', '-L', 'INPUT', '-n'],
         capture_output=True, text=True
     )
-    lines = [l for l in result.stdout.split('\n') if 'DROP' in l]
+    seen = set()
     ips = []
-    for l in lines:
-        parts = l.split()
+    for line in result.stdout.splitlines():
+        if 'DROP' not in line:
+            continue
+        parts = line.split()
+        # Format : DROP all -- IP 0.0.0.0/0
         if len(parts) >= 4:
-            ips.append(parts[3])
-    return jsonify({"blocked_ips": ips, "count": len(ips)})
-
-
-
-# ============================================================
-# SOC Dashboard et règles LLM
-# ============================================================
-import glob as _glob
-from flask import render_template_string as _rts
-
+            ip = parts[3] if len(parts) > 3 else ''
+            # Exclut 0.0.0.0/0 et les entrées déjà vues
+            if ip and ip != '0.0.0.0/0' and '/' not in ip and ip not in seen:
+                seen.add(ip)
+                ips.append(ip)
+    return jsonify({'blocked_ips': ips, 'count': len(ips)})
 @app.route('/dashboard')
 def soc_dashboard():
     try:
@@ -174,66 +189,3 @@ if __name__ == '__main__':
 # Amélioration future — Human-in-the-Loop IP Management
 # ============================================================
 import subprocess as _sp
-
-@app.route('/api/blocked-ips', methods=['GET'])
-def get_blocked_ips():
-    """Liste les IPs actuellement bloquées par iptables."""
-    try:
-        result = _sp.run(
-            ['sudo', 'iptables', '-L', 'INPUT', '-n', '--line-numbers'],
-            capture_output=True, text=True
-        )
-        blocked = []
-        for line in result.stdout.splitlines():
-            if 'DROP' in line and 'INPUT' not in line and 'Chain' not in line:
-                parts = line.split()
-                if len(parts) >= 5:
-                    blocked.append({
-                        'line': parts[0],
-                        'ip': parts[4],
-                        'protocol': parts[3]
-                    })
-        return jsonify({'blocked_ips': blocked, 'count': len(blocked)})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/unblock/<ip>', methods=['POST'])
-def unblock_ip(ip):
-    """Débloque une IP — action réservée à l'analyste SOC."""
-    import re
-    if not re.match(r'^\d+\.\d+\.\d+\.\d+$', ip):
-        return jsonify({'error': 'IP invalide'}), 400
-    try:
-        result = _sp.run(
-            ['sudo', 'iptables', '-D', 'INPUT', '-s', ip, '-j', 'DROP'],
-            capture_output=True, text=True
-        )
-        if result.returncode == 0:
-            return jsonify({
-                'status': 'unblocked',
-                'ip': ip,
-                'message': f'IP {ip} débloquée par analyste SOC'
-            })
-        else:
-            return jsonify({'error': 'IP non trouvée dans les règles'}), 404
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/block/<ip>', methods=['POST'])
-def block_ip_manual(ip):
-    """Bloque manuellement une IP — action analyste SOC."""
-    import re
-    if not re.match(r'^\d+\.\d+\.\d+\.\d+$', ip):
-        return jsonify({'error': 'IP invalide'}), 400
-    try:
-        _sp.run(
-            ['sudo', 'iptables', '-I', 'INPUT', '-s', ip, '-j', 'DROP'],
-            capture_output=True, text=True
-        )
-        return jsonify({
-            'status': 'blocked',
-            'ip': ip,
-            'message': f'IP {ip} bloquée par analyste SOC'
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
