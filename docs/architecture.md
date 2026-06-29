@@ -62,59 +62,68 @@ L'objectif est de démontrer qu'un LLM peut :
 │   self-hosted runner (sur manager)  │
 
 └─────────────────────────────────────┘
-[Kali]         Attaquant lance une attaque
+## 3. Pipeline de détection (Detection as Code)
+
+### Flux complet — de l'attaque à la règle déployée
+[Kali]              Attaquant lance une attaque
 
 ex : hydra -l root -P rockyou.txt ssh://192.168.1.132
-[OpenSSH]      Journalise les tentatives
+[OpenSSH]           Journalise les tentatives
 
 "Failed password for root from 192.168.1.158 port 35304 ssh2"
-[Wazuh]        Décodeur SSH + règles built-in
+[Wazuh]             Décodeur SSH + règles built-in
 
-Règle 100010 (échec SSH) → 8x en 120s → Règle 100003 (Brute Force, level 14)
-[alerts.json]  Alerte JSON générée :
+Règle 100010 (échec SSH) → 8x en 120s → Règle 100003 (level 14)
+[alerts.json]       Alerte JSON générée :
 
 {
 
-"rule": {"level": 14, "id": "100003", "description": "BRUTE FORCE SSH"},
+"rule": {"level": 14, "id": "100003",
+
+"description": "BRUTE FORCE SSH"},
 
 "data": {"srcip": "192.168.1.158", "dstuser": "root"},
 
 "agent": {"id": "001", "name": "kali"}
 
 }
-[pfe-llm-analyst]  Service systemd surveille alerts.json (tail seek)
+[pfe-llm-analyst]   Service systemd surveille alerts.json (tail seek)
 
 Filtre niveau >= 8, catégorise via ATTACK_CATEGORIES
-[Claude API]   claude-sonnet-4-6, max_tokens=400
+[Claude API]        claude-sonnet-4-6, max_tokens=400
 
-→ JSON : type, severite, action, niveau_regle, parent_sid, description_regle
-[Réponse graduée Human-in-the-Loop]
+→ JSON : type, severite, action, niveau_regle,
 
-CRITIQUE → iptables -I INPUT -s IP -j DROP (60 min auto-unblock)
+parent_sid, description_regle
+[Réponse graduée]   Human-in-the-Loop SOAR :
+
+CRITIQUE → iptables DROP 60min (Popen bash)
 
 + Email SOC + Règle XML
 
-HAUTE    → iptables -I INPUT -s IP -j DROP (15 min auto-unblock)
+HAUTE    → iptables DROP 15min (Popen bash)
 
 + Email SOC + Règle XML
 
 MOYENNE  → Email SOC + Règle XML
-[Génération XML]   Template par catégorie → ID unique auto-incrémenté
+[Génération XML]    Template par catégorie → ID unique auto-incrémenté
 
 Validation : wazuh-analysisd -t
 
 Déploiement : /var/ossec/etc/rules/llm_*.xml
 
 restart wazuh-manager
-[GitHub]       Commit automatique : "LLM auto-rule: brute_force_ssh [20260618_003430]"
-[GitHub Actions]  deploy.yml déclenché sur push rules/**
+[GitHub]            Commit automatique :
+
+"LLM auto-rule: brute_force_ssh [20260618_003430]"
+[GitHub Actions]    deploy.yml déclenché sur push rules/**
 
 Job validate : xmllint + test_rules.py (IDs uniques)
 
-Job deploy : self-hosted runner → cp + restart Wazuh
-[Email SOC]   Rapport HTML enrichi :
+Job deploy   : self-hosted runner → cp + restart Wazuh
+[Email SOC]         Rapport HTML enrichi :
 
-- Sévérité + bannière avertissement
+- Sévérité + bannière avertissement SOC
 
 - IP source + lien ipinfo.io
 
@@ -124,15 +133,11 @@ Job deploy : self-hosted runner → cp + restart Wazuh
 
 - Boutons : Débloquer IP / Infos IP / IPs bloquées
 ### Boucle d'apprentissage Detection as Code
-1ère occurrence d'une catégorie
+1ère occurrence d'une catégorie d'attaque
 
 ↓
 
-Appel LLM (~4s) → règle XML générée
-
-↓
-
-Règle déployée dans Wazuh
+Appel LLM (~4s) → règle XML générée et déployée
 
 ↓
 
@@ -174,17 +179,13 @@ Détection directe par Wazuh (latence ms, 0 coût API)
 | POST | /api/unblock/\<ip\> | Déblocage analyste SOC |
 
 ### 4.4 Human-in-the-Loop SOAR
-Sévérité    Action automatique              Validation humaine
+CRITIQUE    iptables DROP 60min + Email      Requise via email
 
-─────────   ──────────────────────────────  ─────────────────
+HAUTE       iptables DROP 15min + Email      Non requise
 
-CRITIQUE    iptables DROP 60min + Email     Requise via email
+MOYENNE     Email uniquement                 Non requise
 
-HAUTE       iptables DROP 15min + Email     Non requise
-
-MOYENNE     Email uniquement                Non requise
-
-FAIBLE      Email uniquement                Non requise
+FAIBLE      Email uniquement                 Non requise
 Déblocage analyste : `POST http://192.168.1.132:8080/api/unblock/<ip>`
 
 ## 5. Règles statiques (8 fichiers, 16 IDs, MITRE ATT&CK)
@@ -202,8 +203,8 @@ Déblocage analyste : `POST http://192.168.1.132:8080/api/unblock/<ip>`
 
 ## 6. Résultats expérimentaux (session 18 juin 2026)
 
-| Scénario | Heure détection | Heure déploiement | Délai | Sévérité | MITRE |
-|----------|----------------|-------------------|-------|---------|-------|
+| Scénario | Détection | Déploiement | Délai | Sévérité | MITRE |
+|----------|-----------|-------------|-------|---------|-------|
 | Nmap scan | 00:27:39 | 00:28:01 | 22s | HAUTE | T1046 |
 | SSH Brute Force | 00:34:27 | 00:34:47 | 20s | CRITIQUE | T1110 |
 | Web scan CGI | 00:40:40 | 00:41:03 | 23s | HAUTE | T1190 |
@@ -230,9 +231,9 @@ Déblocage analyste : `POST http://192.168.1.132:8080/api/unblock/<ip>`
 
 ## 9. Limites et perspectives
 
-### Limites actuelles (acceptables pour un PFE)
+### Limites actuelles
 - Catégorie `default` fourre-tout (Shellshock + autres non catégorisés)
-- Déblocage via `Popen sleep + iptables` (thread non persistant au redémarrage)
+- Déblocage via `Popen sleep + iptables` (non persistant au redémarrage du service)
 - Email simple (pas de ticket ITSM)
 - Active Response graphique limitée (alertes sur agent 000 = manager local)
 
@@ -241,4 +242,4 @@ Déblocage analyste : `POST http://192.168.1.132:8080/api/unblock/<ip>`
 - SOAR professionnel (Cortex XSOAR, Shuffle, Splunk SOAR)
 - Tickets ITSM (ServiceNow, Jira) au lieu d'email
 - Wazuh Active Response natif pour agents distants
-- Interface dashboard "Blocked IP List" avec historique et audit trail complet
+- Interface dashboard avec historique et audit trail complet
