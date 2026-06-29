@@ -48,20 +48,23 @@ def index():
 @app.route('/api/stats')
 def stats():
     # Lit le log LLM réel (llm_analysis.log)
-    llm_log = os.path.expanduser('~/pfe_soc/logs/llm_analysis.log')
+    import json as _json
+    llm_log = '/home/ubuntu/pfe_soc/logs/llm_analysis.log'
     detections = []
     ips = defaultdict(int)
     categories = defaultdict(int)
 
     if os.path.exists(llm_log):
-        import json as _json
         with open(llm_log) as f:
             for line in f:
+                line = line.strip()
+                if not line:
+                    continue
                 try:
-                    d = _json.loads(line.strip())
+                    d = _json.loads(line)
                     detections.append(d)
                     ip = d.get('srcip', '')
-                    if ip and ip not in ('N/A', 'local', ''):
+                    if ip and ip not in ('N/A', 'local', '', '127.0.0.1'):
                         ips[ip] += 1
                     cat = d.get('category', '')
                     if cat:
@@ -152,19 +155,21 @@ def blocked_ips():
         ['sudo', 'iptables', '-L', 'INPUT', '-n'],
         capture_output=True, text=True
     )
+    import re as _re
     seen = set()
     ips = []
     for line in result.stdout.splitlines():
         if 'DROP' not in line:
             continue
         parts = line.split()
-        # Format : DROP all -- IP 0.0.0.0/0
-        if len(parts) >= 4:
-            ip = parts[3] if len(parts) > 3 else ''
-            # Exclut 0.0.0.0/0 et les entrées déjà vues
-            if ip and ip != '0.0.0.0/0' and '/' not in ip and ip not in seen:
-                seen.add(ip)
-                ips.append(ip)
+        # iptables -L INPUT -n : DROP all -- SRC DST
+        # cherche une IP valide dans les colonnes source (index 3)
+        for col in parts:
+            if _re.match(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$', col):
+                if col != '0.0.0.0' and col not in seen:
+                    seen.add(col)
+                    ips.append(col)
+                break
     return jsonify({'blocked_ips': ips, 'count': len(ips)})
 @app.route('/dashboard')
 def soc_dashboard():
