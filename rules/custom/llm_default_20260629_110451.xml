@@ -1,8 +1,0 @@
-<group name="llm_generated,local,">
-<rule id="100053" level="15">
-  <if_sid>1002</if_sid>
-  <description>LLM: Tentative dexploitation Shellshock CVE-2014-6271 detectee sur serveur web avec injection de</description>
-  <mitre><id>T1059</id></mitre>
-  <group>llm_detected,</group>
-</rule>
-</group>
