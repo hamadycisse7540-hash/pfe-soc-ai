@@ -1,0 +1,5 @@
+<group name="test_invalid">
+  <rule id="INVALID_ID" level="99">
+    <description>Règle XML invalide — test erreur CI/CD</description>
+    <!-- tag non fermé
+  </rule>
